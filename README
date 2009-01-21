@@ -1,0 +1,6 @@
+Labjack/Nerdjack Tools
+by Jim Paris <jim@jtan.com>
+with modifications by Zach Clifford <zacharyc@mit.edu>
+
+These tools are for interacting with the LabJack UE9 or the NerdJack over the Ethernet interface.  More information about the UE9 device:
+  http://www.labjack.com/labjack_ue9.php
