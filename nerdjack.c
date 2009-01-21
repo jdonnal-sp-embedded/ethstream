@@ -115,20 +115,26 @@ int nerdjack_detect(char * ipAddress) {
    return 0;
 }
 
+typedef struct {
+int numCopies;
+int * destlist;
+} deststruct;
+
 int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_list, int precision, int convert, int lines)
 {
 	unsigned char buf[NERDJACK_PACKET_SIZE];
 
-	int numGroups = NERDJACK_NUM_SAMPLES / numChannels;
+	//int numGroups = NERDJACK_NUM_SAMPLES / numChannels;
 
     int index = 0;
-    int totalread = 0;
+    //int totalread = 0;
     int ret = 0;
     int alignment = 0;
     signed short datapoint = 0;
     signed short dataline[NERDJACK_CHANNELS];
     long double voltline[NERDJACK_CHANNELS];
-    int destination[NERDJACK_CHANNELS];
+    deststruct destination[NERDJACK_CHANNELS];
+    int tempdestlist[NERDJACK_CHANNELS];
     unsigned short currentcount = 0;
     unsigned long memused = 0;
 	unsigned short packetsready = 0;
@@ -144,22 +150,41 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
     
     int channels_left = numChannels;
     int channelprocessing = 0;
-    int currentalign = 0;
+    int currentalign = 0; //Index into sampled channels
     int i;
+    int numDuplicates = 0;
     
     //Loop through channel_list until all channels recognized
-    //destination holds the index where each channel should go for reordering
+    //start with channelprocessing = 0 and increment through channels.
+    //If a channel is found in the list set it up appropriately.
     do {
+        //numduplicates = 0;
+        destination[currentalign].numCopies = 0;
         for(i = 0; i < numChannels; i++) {
             if(channelprocessing == channel_list[i]) {
-                destination[currentalign] = i;
-                currentalign++;
+                //destination[currentalign] = i;
+                tempdestlist[destination[currentalign].numCopies] = i;
+                if(destination[currentalign].numCopies > 0) {
+                    numDuplicates++;
+                }
+                destination[currentalign].numCopies++;
+                //currentalign++;
                 channels_left--;
-                break;
+                //break;
             }
+        }
+        
+        if(destination[currentalign].numCopies > 0) {
+            destination[currentalign].destlist = malloc( destination[currentalign].numCopies * sizeof(int) );
+            memcpy(destination[currentalign].destlist, tempdestlist, destination[currentalign].numCopies * sizeof(int));
+            currentalign++;
         }
         channelprocessing++;
     } while(channels_left > 0);
+    
+    
+    int numChannelsSampled = numChannels - numDuplicates;
+    int numGroups = NERDJACK_NUM_SAMPLES / numChannelsSampled;
 
     /* Send request */
 	ret = send_all_timeout(data_fd, command, strlen(command), 0, 
@@ -211,25 +236,32 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
         //While there is still more data in the packet, process it
 		while(charsread > index) {
 			datapoint = (buf[index] << 8 | buf[index+1]);
-			if(convert) {
+            if(convert) {
 				if(alignment <= 5) {
 					volts = (long double) ( datapoint / 32767.0 ) * ((precision & 0x01) ? 5.0 : 10.0);
 				} else {
 					volts = (long double) (datapoint / 32767.0 ) * ((precision & 0x02) ? 5.0 : 10.0);
 				}
-                voltline[destination[alignment]] = volts;
+                for(i = 0; i < destination[alignment].numCopies; i++) {
+                    voltline[destination[alignment].destlist[i]] = volts;
+                }
 			} else {
-                dataline[destination[alignment]] = datapoint;
+                for(i = 0; i < destination[alignment].numCopies; i++) {
+                    dataline[destination[alignment].destlist[i]] = datapoint;
+                }
 			}
             
             //Each point is two bytes, so increment index and total bytes read
 			index++;
 			index++;
-			totalread++;
-			alignment++;
+            alignment++;
+			//totalread++;
+            
+            
+			
             
             //Since channel data is packed, we need to know when to insert a newline
-			if(alignment == numChannels){
+			if(alignment == numChannelsSampled){
                 if(convert) {
                     for(i = 0; i < numChannels; i++) {
                         printf("%Lf ",voltline[i]);

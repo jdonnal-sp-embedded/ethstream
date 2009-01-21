@@ -1,2 +1,2 @@
 /* This file was automatically generated. */
-#define VERSION "1.3 (2008-09-19)"
+#define VERSION "1.0 (2009-01-21)"
