@@ -131,7 +131,7 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
     int ret = 0;
     int alignment = 0;
     signed short datapoint = 0;
-    signed short dataline[NERDJACK_CHANNELS];
+    unsigned short dataline[NERDJACK_CHANNELS];
     long double voltline[NERDJACK_CHANNELS];
     deststruct destination[NERDJACK_CHANNELS];
     int tempdestlist[NERDJACK_CHANNELS];
@@ -247,7 +247,8 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
                 }
 			} else {
                 for(i = 0; i < destination[alignment].numCopies; i++) {
-                    dataline[destination[alignment].destlist[i]] = datapoint;
+                    dataline[destination[alignment].destlist[i]] = 
+                        (unsigned short) (datapoint - INT16_MIN);
                 }
 			}
             
@@ -268,7 +269,7 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
                     }
                 } else {
                     for(i = 0; i < numChannels; i++) {
-                        printf("%hd ",dataline[i]);
+                        printf("%hu ",dataline[i]);
                     }
                 }
 				printf("\n");
