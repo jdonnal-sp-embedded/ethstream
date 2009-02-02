@@ -196,6 +196,8 @@ int main(int argc, char *argv[])
 			return (help == stdout) ? 0 : 1;
 		}
 	}
+
+    doneparse:
     
     if (nerdjack) {
         if (channel_count > NERDJACK_CHANNELS) {
@@ -302,6 +304,12 @@ int main(int argc, char *argv[])
 		if (ret == 0)
 		        break;
 
+        if (ret == -ENOTCONN && !nerdjack) {
+            info("Could not connect LabJack...Trying NerdJack\n");
+            nerdjack = 1;
+            goto doneparse;
+        }
+        
 		if (ret == -ENOTCONN && !forceretry) {
 			info("Initial connection failed, giving up\n");
 			break;
