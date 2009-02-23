@@ -29,10 +29,12 @@
 #include "opt.h"
 #include "version.h"
 #include "compat.h"
+#include "ethstream.h"
 
 #define DEFAULT_HOST "192.168.1.209"
 #define UE9_COMMAND_PORT 52360
 #define UE9_DATA_PORT 52361
+
 
 struct callbackInfo { 
 	struct ue9Calibration calib;
@@ -50,7 +52,8 @@ struct options opt[] = {
 	{ 'r', "rate", "hz", "sample each channel at this rate (8000.0)" },
 	{ 'o', "oneshot", NULL, "don't retry in case of errors" },
 	{ 'f', "forceretry", NULL, "retry no matter what happens" },
-	{ 'c', "convert", NULL, "display output in volts" },
+	{ 'c', "convert", NULL, "convert output to volts" },
+    { 'H', "converthex", NULL, "convert output to hex" },
 	{ 'l', "lines", "num", "if set, output this many lines and quit" },
 	{ 'h', "help", NULL, "this help" },
 	{ 'v', "verbose", NULL, "be verbose" },
@@ -87,7 +90,7 @@ int main(int argc, char *argv[])
 	double actual_rate;
 	int oneshot = 0;
 	int forceretry = 0;
-	int convert = 0;
+	int convert = CONVERT_DEC;
 	uint8_t scanconfig;
 	uint16_t scaninterval;
 #if UE9_CHANNELS > NERDJACK_CHANNELS
@@ -173,7 +176,18 @@ int main(int argc, char *argv[])
 		  	forceretry++;
 			break;
 		case 'c':
-			convert++;
+            if (convert != 0) {
+                info("specify only one conversion type\n");
+                goto printhelp;
+            }
+            convert = CONVERT_VOLTS;
+			break;
+		case 'H':
+            if (convert != 0) {
+                info("specify only one conversion type\n");
+                goto printhelp;
+            }
+            convert = CONVERT_HEX;
 			break;
 		case 'v':
 			verb_count++;
@@ -352,7 +366,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
     if (nerd_send_command(address,command) < 0) {
 		if (first_call)
 			retval = -ENOTCONN;
-        info("Failed to send command\n");
+        info("Failed to send GET command\n");
         goto out;
     }
 	first_call = 0;
@@ -464,17 +478,30 @@ int data_callback(int channels, uint16_t *data, void *context)
 
 	columns_left = channels;
 	for (i = 0; i < channels; i++) {
-		if (ci->convert)
-			printf("%lf", ue9_binary_to_analog(
+		switch (ci->convert) {
+        case CONVERT_VOLTS:
+			if (printf("%lf", ue9_binary_to_analog(
 				       &ci->calib, UE9_BIPOLAR_GAIN1, 12, 
-				       data[i]));
-		else
-			printf("%d", data[i]);
+				       data[i])) < 0)
+                goto bad;
+            break;
+        case CONVERT_HEX:
+            if (printf("%04X", data[i]) < 0)
+                    goto bad;
+            break;
+        default:
+        case CONVERT_DEC:
+			if (printf("%d", data[i]) < 0)
+                goto bad;
+            break;
+        }
 		columns_left--;
 		if (i < (channels - 1)) {
-			putchar(' ');
+            if (ci->convert != CONVERT_HEX && putchar(' ') < 0)
+                goto bad;
 		} else {
-			putchar('\n');
+			if (putchar('\n') < 0)
+                goto bad;
 			lines++;
 			if (ci->maxlines && lines >= ci->maxlines)
 				return -1;
@@ -482,4 +509,8 @@ int data_callback(int channels, uint16_t *data, void *context)
 	}
 	
 	return 0;
+
+bad:
+    info("Output error (disk full?)\n");
+    return -1;
 }

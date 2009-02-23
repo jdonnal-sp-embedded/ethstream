@@ -23,6 +23,7 @@
 #include "nerdjack.h"
 #include "util.h"
 #include "netutil.h"
+#include "ethstream.h"
 
 #define NERDJACK_TIMEOUT 5   /* Timeout for connect/send/recv, in seconds */
 
@@ -73,7 +74,7 @@ int nerdjack_detect(char * ipAddress) {
    
    if((-1 == sock) || (-1 == receivesock)) /* if socket failed to initialize, exit */
    {
-      printf("Error Creating Socket\n");
+      verb("Error Creating Socket\n");
       return -1;
    }
 
@@ -93,7 +94,7 @@ int nerdjack_detect(char * ipAddress) {
 
    bytes_sent = sendto(sock, buffer, buffer_length, 0,(struct sockaddr*) &sa, sizeof(struct sockaddr_in) );
    if(bytes_sent < 0) {
-     printf("Error sending packet: %s\n", strerror(errno) );
+     info("Error sending packet: %s\n", strerror(errno) );
 	 return -1;
 	}
 
@@ -240,14 +241,14 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 
 		//First check the header info
 		if(buf[0] != 0xF0 || buf[1] != 0xAA) {
-			printf("No Header info\n");
+			info("No Header info\n");
 			return -1;
 		}
 
 		//Check counter info to make sure not out of order
 		tempshort = (buf[2] << 8) | buf[3];
 		if(tempshort != currentcount ){
-			printf("Count wrong. Expected %hd but got %hd\n", currentcount, tempshort);
+			info("Count wrong. Expected %hd but got %hd\n", currentcount, tempshort);
 			return -1;
 		}
         
@@ -265,7 +266,8 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
         //While there is still more data in the packet, process it
 		while(charsread > index) {
 			datapoint = (buf[index] << 8 | buf[index+1]);
-            if(convert) {
+            switch(convert) {
+            case CONVERT_VOLTS:
 				if(alignment <= 5) {
 					volts = (long double) ( datapoint / 32767.0 ) * ((precision & 0x01) ? 5.0 : 10.0);
 				} else {
@@ -274,11 +276,15 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
                 for(i = 0; i < destination[alignment].numCopies; i++) {
                     voltline[destination[alignment].destlist[i]] = volts;
                 }
-			} else {
+                break;
+            default:
+            case CONVERT_HEX:
+            case CONVERT_DEC:
                 for(i = 0; i < destination[alignment].numCopies; i++) {
                     dataline[destination[alignment].destlist[i]] = 
                         (unsigned short) (datapoint - INT16_MIN);
                 }
+                break;
 			}
             
             //Each point is two bytes, so increment index and total bytes read
@@ -292,16 +298,29 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
             
             //Since channel data is packed, we need to know when to insert a newline
 			if(alignment == numChannelsSampled){
-                if(convert) {
+                switch(convert) {
+                case CONVERT_VOLTS:
                     for(i = 0; i < numChannels; i++) {
-                        printf("%Lf ",voltline[i]);
+                        if (printf("%Lf ",voltline[i]) < 0)
+                            goto bad;
                     }
-                } else {
+                    break;
+                case CONVERT_HEX:
                     for(i = 0; i < numChannels; i++) {
-                        printf("%hu ",dataline[i]);
+                        if (printf("%04hX",dataline[i]) < 0)
+                            goto bad;
                     }
+                    break;
+                default:
+                case CONVERT_DEC:
+                    for(i = 0; i < numChannels; i++) {
+                        if (printf("%hu ",dataline[i]) < 0)
+                            goto bad;
+                    }
+                    break;
                 }
-				printf("\n");
+				if(printf("\n") < 0)
+                    goto bad;
 				alignment = 0;
 				numgroups++;
                 if(lines != 0) {
@@ -321,6 +340,10 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 
 	return 0;
 
+bad:
+    info("Output error (disk full?)\n");
+    return -1;
+
 }
 
 int nerd_open(const char *address,int port) {
@@ -333,7 +356,7 @@ int nerd_open(const char *address,int port) {
 
     if(-1 == i32SocketFD)
     {
-      printf("cannot create socket");
+      verb("cannot create socket");
       return -1;
     }
     
