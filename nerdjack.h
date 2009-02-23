@@ -19,6 +19,7 @@
 #define NERDJACK_CLOCK_RATE 54000000
 #define NERDJACK_DATA_PORT 49155
 #define NERDJACK_UDP_RECEIVE_PORT 49156
+#define NERDJACK_COMMAND_PORT 49157
 
 #define NERDJACK_PACKET_SIZE 1460
 #define NERDJACK_NUM_SAMPLES 724
@@ -31,8 +32,11 @@ int nerd_close_conn(int data_fd);
 int nerd_generate_command(char * command, int * channel_list, int channel_count, int precision,
     unsigned short period);
 
+/* Send given command to NerdJack */
+int nerd_send_command(const char * address, char * command);
+
 /* Stream data out of the NerdJack */
-int nerd_data_stream(int data_fd, char * command, int numChannels, int * channel_list, int precision, int convert, int lines);
+int nerd_data_stream(int data_fd, int numChannels, int * channel_list, int precision, int convert, int lines);
 
 /* Detect the IP Address of the NerdJack and return in ipAddress */
 int nerdjack_detect(char * ipAddress);

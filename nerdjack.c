@@ -120,7 +120,43 @@ int numCopies;
 int * destlist;
 } deststruct;
 
-int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_list, int precision, int convert, int lines)
+int nerd_send_command(const char * address, char * command)
+{
+    int ret,fd_command;
+    char buf[3];
+    fd_command = nerd_open(address, NERDJACK_COMMAND_PORT);
+    if (fd_command < 0) {
+        info("Connect failed: %s:%d\n", address, NERDJACK_COMMAND_PORT);
+        return -2; 
+    }
+
+    /* Send request */
+	ret = send_all_timeout(fd_command, command, strlen(command), 0, 
+			       & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT });
+	if (ret < 0 || ret != strlen(command)) {
+		verb("short send %d\n", (int)ret);
+		return -1;
+	}
+
+    ret = recv_all_timeout(fd_command,buf,3,0,
+           & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT });
+
+    nerd_close_conn(fd_command);
+
+    if (ret < 0 || ret != 3) {
+        verb("Error receiving OK for command\n");
+        return -1;
+     }
+
+    if (0 != strcmp("OK",buf)){
+        verb("Did not receive OK.  Received %s\n",buf);
+        return -3;
+    }
+
+    return 0;
+}
+
+int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines)
 {
 	unsigned char buf[NERDJACK_PACKET_SIZE];
 
@@ -128,7 +164,7 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
 
     int index = 0;
     //int totalread = 0;
-    int ret = 0;
+    //int ret = 0;
     int alignment = 0;
     signed short datapoint = 0;
     unsigned short dataline[NERDJACK_CHANNELS];
@@ -186,13 +222,6 @@ int nerd_data_stream(int data_fd, char * command, int numChannels, int *channel_
     int numChannelsSampled = numChannels - numDuplicates;
     int numGroups = NERDJACK_NUM_SAMPLES / numChannelsSampled;
 
-    /* Send request */
-	ret = send_all_timeout(data_fd, command, strlen(command), 0, 
-			       & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT });
-	if (ret < 0 || ret != strlen(command)) {
-		verb("short send %d\n", (int)ret);
-		return -1;
-	}
 
 	//Loop forever to grab data
     while((charsread = recv_all_timeout(data_fd,buf,NERDJACK_PACKET_SIZE,0,

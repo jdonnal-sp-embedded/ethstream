@@ -337,23 +337,35 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
 	static int first_call = 1;
     char command[13];
 
+    
+    if (nerd_generate_command(command, channel_list, channel_count, precision, period) < 0) {
+        info("Failed to create configuration command\n");
+        goto out;
+    }
+
+
+    if (nerd_send_command(address,"STOP") < 0) {
+        info("Failed to send STOP command\n");
+        goto out;
+    }
+
+    if (nerd_send_command(address,command) < 0) {
+		if (first_call)
+			retval = -ENOTCONN;
+        info("Failed to send command\n");
+        goto out;
+    }
+	first_call = 0;
+    
 	/* Open connection.  If this fails, and this is the
   	   first attempt, return a different error code so we give up. */
 	fd_data = nerd_open(address, NERDJACK_DATA_PORT);
 	if (fd_data < 0) {
 		info("Connect failed: %s:%d\n", address, NERDJACK_DATA_PORT);
-		if (first_call)
-			retval = -ENOTCONN;
-		goto out;
+        goto out;
 	}
-	first_call = 0;
     
-    if (nerd_generate_command(command, channel_list, channel_count, precision, period) < 0) {
-        info("Failed to create configuration command\n");
-        goto out1;
-    }
-    
-    if (nerd_data_stream(fd_data, command, channel_count, channel_list, precision, convert, lines) < 0) {
+    if (nerd_data_stream(fd_data, channel_count, channel_list, precision, convert, lines) < 0) {
         info("Failed to open data stream\n");
         goto out1;
     }
