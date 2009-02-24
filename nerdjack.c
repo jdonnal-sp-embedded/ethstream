@@ -402,7 +402,7 @@ int nerd_generate_command(char * command, int * channel_list, int channel_count,
         channelbit = channelbit | (0x1 << channel_list[i]);
     }
 
-    sprintf(command,"GET%3.3X%d%5.5d", channelbit,precision,period);
+    sprintf(command,"GETD%3.3X%d%5.5d", channelbit,precision,period);
     
     return 0;
     

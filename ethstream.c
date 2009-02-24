@@ -349,7 +349,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
 	int retval = -EAGAIN;
 	int fd_data;
 	static int first_call = 1;
-    char command[13];
+    char command[14];
 
     
     if (nerd_generate_command(command, channel_list, channel_count, precision, period) < 0) {
