@@ -36,7 +36,7 @@ int nerd_generate_command(char * command, int * channel_list, int channel_count,
 int nerd_send_command(const char * address, char * command);
 
 /* Stream data out of the NerdJack */
-int nerd_data_stream(int data_fd, int numChannels, int * channel_list, int precision, int convert, int lines);
+int nerd_data_stream(int data_fd, int numChannels, int * channel_list, int precision, int convert, int lines, int showmem);
 
 /* Detect the IP Address of the NerdJack and return in ipAddress */
 int nerdjack_detect(char * ipAddress);

@@ -54,6 +54,7 @@ struct options opt[] = {
 	{ 'f', "forceretry", NULL, "retry no matter what happens" },
 	{ 'c', "convert", NULL, "convert output to volts" },
     { 'H', "converthex", NULL, "convert output to hex" },
+    { 'm', "showmem", NULL, "output memory stats with data (NJ only)" },
 	{ 'l', "lines", "num", "if set, output this many lines and quit" },
 	{ 'h', "help", NULL, "this help" },
 	{ 'v', "verbose", NULL, "be verbose" },
@@ -64,7 +65,7 @@ struct options opt[] = {
 int doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	     int *channel_list, int channel_count, int convert, int maxlines);
 int nerdDoStream(const char *address, int *channel_list, int channel_count, int precision, 
-            unsigned short period, int convert, int lines);
+            unsigned short period, int convert, int lines, int showmem);
 int data_callback(int channels, uint16_t *data, void *context);
 
 int columns_left = 0;
@@ -91,6 +92,7 @@ int main(int argc, char *argv[])
 	int oneshot = 0;
 	int forceretry = 0;
 	int convert = CONVERT_DEC;
+    int showmem = 0;
 	uint8_t scanconfig;
 	uint16_t scaninterval;
 #if UE9_CHANNELS > NERDJACK_CHANNELS
@@ -189,6 +191,8 @@ int main(int argc, char *argv[])
             }
             convert = CONVERT_HEX;
 			break;
+        case 'm':
+            showmem++;
 		case 'v':
 			verb_count++;
 			break;
@@ -303,7 +307,7 @@ int main(int argc, char *argv[])
 	for (;;) {
 		int ret;
         if(nerdjack) {
-            ret = nerdDoStream(address, channel_list, channel_count, precision, period, convert, lines);
+            ret = nerdDoStream(address, channel_list, channel_count, precision, period, convert, lines, showmem);
             verb("nerdDoStream returned %d\n", ret);
         
         } else {
@@ -344,7 +348,7 @@ int main(int argc, char *argv[])
 }
 
 int nerdDoStream(const char *address, int *channel_list, int channel_count, int precision, 
-            unsigned short period, int convert, int lines)
+            unsigned short period, int convert, int lines, int showmem)
 {
 	int retval = -EAGAIN;
 	int fd_data;
@@ -379,7 +383,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
         goto out;
 	}
     
-    if (nerd_data_stream(fd_data, channel_count, channel_list, precision, convert, lines) < 0) {
+    if (nerd_data_stream(fd_data, channel_count, channel_list, precision, convert, lines, showmem) < 0) {
         info("Failed to open data stream\n");
         goto out1;
     }

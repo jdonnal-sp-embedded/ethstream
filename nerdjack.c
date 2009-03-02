@@ -32,8 +32,12 @@
 int nerdjack_choose_scan(double desired_rate, double *actual_rate, int *period)
 {
     
-	*period = round((double) NERDJACK_CLOCK_RATE / desired_rate);
-    * actual_rate = (double) NERDJACK_CLOCK_RATE / (double) *period;
+	*period = floor((double) NERDJACK_CLOCK_RATE / desired_rate);
+    if(*period > UINT16_MAX) {
+        info("Cannot sample that slowly\n");
+        return -1;
+    }
+    *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) *period;
 	if(*actual_rate != desired_rate) {
 		return -1;
 	}
@@ -157,7 +161,7 @@ int nerd_send_command(const char * address, char * command)
     return 0;
 }
 
-int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines)
+int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines, int showmem)
 {
 	unsigned char buf[NERDJACK_PACKET_SIZE];
 
@@ -262,6 +266,11 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 		packetsready = (buf[10] << 8) | (buf[11]);
 		alignment = 0;
 		numgroups = 0;
+
+        if(showmem) {
+            printf("%lX %hd %hd\n",memused, adcused, packetsready);
+            continue;
+        }
         
         //While there is still more data in the packet, process it
 		while(charsread > index) {
