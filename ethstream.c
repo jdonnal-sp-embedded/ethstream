@@ -379,6 +379,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
     //to resume the interrupted transmission   
     first_call = 0;
 
+    //If we had a transmission in progress, send a command to resume from there
     if(currentcount != 0) {
         char cmdbuf[10];
         sprintf(cmdbuf,"SETC%05hd",currentcount);

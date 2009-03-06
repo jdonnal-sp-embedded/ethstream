@@ -27,6 +27,12 @@
 
 #define NERDJACK_TIMEOUT 5   /* Timeout for connect/send/recv, in seconds */
 
+//Struct holding information about how channels should be reordered for output
+typedef struct {
+    int numCopies;
+    int * destlist;
+} deststruct;
+
 /* Choose the best ScanConfig and ScanInterval parameters for the
    desired scanrate.  Returns -1 if no valid config found */
 int nerdjack_choose_scan(double desired_rate, double *actual_rate, int *period)
@@ -120,11 +126,6 @@ int nerdjack_detect(char * ipAddress) {
    return 0;
 }
 
-typedef struct {
-int numCopies;
-int * destlist;
-} deststruct;
-
 int nerd_send_command(const char * address, char * command)
 {
     int ret,fd_command;
@@ -161,6 +162,7 @@ int nerd_send_command(const char * address, char * command)
     return 0;
 }
 
+//Initialize the channel structure to distill how data should be displayed
 static int nerd_init_channels(deststruct * destination, int numChannels, int *channel_list) {
 
     int channels_left = numChannels;
@@ -208,7 +210,6 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 {
     //Variables that should persist across retries
     static unsigned char buf[NERDJACK_PACKET_SIZE];
-    //static int charsleft = NERDJACK_PACKET_SIZE;
     static int linesleft = 0;
 
     int index = 0;
@@ -250,25 +251,11 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 
 		//We want a complete packet, so take the chars so far and keep waiting
 		if(charsread != NERDJACK_PACKET_SIZE) {
-            //charsleft = NERDJACK_PACKET_SIZE - charsread;
             //There was a problem getting data.  Probably a closed
-            //connection. Stash the data we did get, save state, and hope
-            //to get it later
-
+            //connection.
 		    info("Packet was too short\n");
 	            return -2;
-            /*
-			charsleft = NERDJACK_PACKET_SIZE - charsread;
-			while(charsleft != 0){
-				additionalread = recv_all_timeout(data_fd,buf+charsread,charsleft,0,
-                     & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT });
-				charsread = charsread + additionalread;
-				charsleft = NERDJACK_PACKET_SIZE - charsread;
-			}
-            */
 		}
-        
-        //charsleft = NERDJACK_PACKET_SIZE;
 
 		//First check the header info
 		if(buf[0] != 0xF0 || buf[1] != 0xAA) {
@@ -300,6 +287,7 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
         }
         
         //While there is still more data in the packet, process it
+        //use the destination structure to load the line before printing
 		while(charsread > index) {
 			datapoint = (buf[index] << 8 | buf[index+1]);
             switch(convert) {
@@ -428,6 +416,7 @@ int nerd_open(const char *address,int port) {
 	return i32SocketFD;
 }
 
+//Generate an appropriate sample initiation command
 int nerd_generate_command(char * command, int * channel_list, int channel_count, int precision,
     unsigned short period) {
     
