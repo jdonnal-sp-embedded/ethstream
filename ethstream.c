@@ -359,6 +359,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
 	int retval = -EAGAIN;
 	int fd_data;
 	static int first_call = 1;
+    static int started = 0;
     char command[14];
     static unsigned short currentcount = 0;
 
@@ -386,7 +387,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
     first_call = 0;
 
     //If we had a transmission in progress, send a command to resume from there
-    if(currentcount != 0) {
+    if(started == 1) {
         char cmdbuf[10];
         sprintf(cmdbuf,"SETC%05hd",currentcount);
         if (nerd_send_command(address,cmdbuf) < 0) {
@@ -394,6 +395,8 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
             goto out;
         }
     }
+
+    started = 1;
     
 	/* Open connection */
 	fd_data = nerd_open(address, NERDJACK_DATA_PORT);

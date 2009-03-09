@@ -211,6 +211,7 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
     //Variables that should persist across retries
     static unsigned char buf[NERDJACK_PACKET_SIZE];
     static int linesleft = 0;
+    static int linesdumped = 0;
 
     int index = 0;
     int alignment = 0;
@@ -322,6 +323,7 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
             
             //Since channel data is packed, we need to know when to insert a newline
 			if(alignment == numChannelsSampled){
+                if(linesdumped != 0){
                 switch(convert) {
                 case CONVERT_VOLTS:
                     for(i = 0; i < numChannels; i++) {
@@ -345,6 +347,12 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
                 }
 				if(printf("\n") < 0)
                     goto bad;
+                } else {
+                    linesdumped = linesdumped + 1;
+                    if(lines != 0) {
+                        linesleft++;
+                    }
+                }
 				alignment = 0;
 				numgroups++;
                 if(lines != 0) {
