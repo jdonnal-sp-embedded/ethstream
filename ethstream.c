@@ -163,7 +163,13 @@ int main(int argc, char *argv[])
 			}
 			break;
         case 'p':
-            precision++;
+			tmp = strtol(optarg, &endp, 0);
+            if (tmp <= 3 && tmp >= 0) {
+                precision = tmp;
+            } else {
+                info("Bad argument to p: %s\n",optarg);
+                goto printhelp;
+            }
             break;
         case 'N':
             nerdjack++;
