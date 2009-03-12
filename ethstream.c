@@ -363,6 +363,8 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
     char command[14];
     static unsigned short currentcount = 0;
 
+    usleep(1000000);
+
     if(first_call) {
         if (nerd_generate_command(command, channel_list, channel_count, precision, period) < 0) {
             info("Failed to create configuration command\n");
