@@ -360,26 +360,26 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
 	int fd_data;
 	static int first_call = 1;
     static int started = 0;
-    char command[14];
+    getPacket command;
     static unsigned short currentcount = 0;
 
-    usleep(1000000);
+    //usleep(1000000);
 
     if(first_call) {
-        if (nerd_generate_command(command, channel_list, channel_count, precision, period) < 0) {
+        if (nerd_generate_command(&command, channel_list, channel_count, precision, period) < 0) {
             info("Failed to create configuration command\n");
             goto out;
         }
 
 
-        if (nerd_send_command(address,"STOP") < 0) {
+        if (nerd_send_command(address,"STOP", 4) < 0) {
             if (first_call)
                 retval = -ENOTCONN;            
             info("Failed to send STOP command\n");
             goto out;
         }
 
-        if (nerd_send_command(address,command) < 0) {
+        if (nerd_send_command(address,&command, sizeof(command)) < 0) {
             info("Failed to send GET command\n");
             goto out;
         }
@@ -392,7 +392,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
     if(started == 1) {
         char cmdbuf[10];
         sprintf(cmdbuf,"SETC%05hd",currentcount);
-        if (nerd_send_command(address,cmdbuf) < 0) {
+        if (nerd_send_command(address,cmdbuf,strlen(cmdbuf)) < 0) {
             info("Failed to send SETC command\n");
             goto out;
         }

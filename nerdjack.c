@@ -33,6 +33,16 @@ typedef struct {
     int * destlist;
 } deststruct;
 
+typedef struct __attribute__((__packed__)) {
+	unsigned char headerone;
+	unsigned char headertwo;
+	unsigned short packetNumber;
+	unsigned long lwipmemoryused;
+	unsigned short adcused;
+	unsigned short packetsready;
+	signed short data[NERDJACK_NUM_SAMPLES];
+} dataPacket;
+
 /* Choose the best ScanConfig and ScanInterval parameters for the
    desired scanrate.  Returns -1 if no valid config found */
 int nerdjack_choose_scan(double desired_rate, double *actual_rate, int *period)
@@ -126,7 +136,7 @@ int nerdjack_detect(char * ipAddress) {
    return 0;
 }
 
-int nerd_send_command(const char * address, char * command)
+int nerd_send_command(const char * address, void * command, int length)
 {
     int ret,fd_command;
     char buf[3];
@@ -137,9 +147,9 @@ int nerd_send_command(const char * address, char * command)
     }
 
     /* Send request */
-	ret = send_all_timeout(fd_command, command, strlen(command), 0, 
+	ret = send_all_timeout(fd_command, command, length, 0, 
 			       & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT });
-	if (ret < 0 || ret != strlen(command)) {
+	if (ret < 0 || ret != length) {
 		verb("short send %d\n", (int)ret);
 		return -1;
 	}
@@ -209,11 +219,12 @@ return numDuplicates;
 int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines, int showmem, unsigned short * currentcount)
 {
     //Variables that should persist across retries
-    static unsigned char buf[NERDJACK_PACKET_SIZE];
+    static dataPacket buf;
     static int linesleft = 0;
     static int linesdumped = 0;
 
     int index = 0;
+    int charsprocessed = 0;
     int alignment = 0;
     signed short datapoint = 0;
     unsigned short dataline[NERDJACK_CHANNELS];
@@ -247,7 +258,7 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 
 
 	//Loop forever to grab data
-    while((charsread = recv_all_timeout(data_fd,buf,NERDJACK_PACKET_SIZE,0,
+    while((charsread = recv_all_timeout(data_fd,&buf,NERDJACK_PACKET_SIZE,0,
            & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT }))){
 
 		//We want a complete packet, so take the chars so far and keep waiting
@@ -259,13 +270,14 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 		}
 
 		//First check the header info
-		if(buf[0] != 0xF0 || buf[1] != 0xAA) {
+		if(buf.headerone != 0xF0 || buf.headertwo != 0xAA) {
 			info("No Header info\n");
 			return -1;
 		}
 
 		//Check counter info to make sure not out of order
-		tempshort = (buf[2] << 8) | buf[3];
+        tempshort = ntohs(buf.packetNumber);
+		//tempshort = (buf[2] << 8) | buf[3];
 		if(tempshort != *currentcount ){
 			info("Count wrong. Expected %hd but got %hd\n", *currentcount, tempshort);
 			return -1;
@@ -275,10 +287,13 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 		*currentcount = *currentcount + 1;
         
         //Process the rest of the header and update the index value to be pointing after it
-		index = 12;
-		memused = (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | (buf[7]);
-		adcused = (buf[8] << 8) | (buf[9]);
-		packetsready = (buf[10] << 8) | (buf[11]);
+		charsprocessed = 12;
+        memused = ntohl(buf.lwipmemoryused);
+		//memused = (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | (buf[7]);
+        adcused = ntohs(buf.adcused);
+		//adcused = (buf[8] << 8) | (buf[9]);
+        packetsready = ntohs(buf.packetsready);
+		//packetsready = (buf[10] << 8) | (buf[11]);
 		alignment = 0;
 		numgroups = 0;
 
@@ -287,10 +302,12 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
             continue;
         }
         
+        index = 0;
         //While there is still more data in the packet, process it
         //use the destination structure to load the line before printing
-		while(charsread > index) {
-			datapoint = (buf[index] << 8 | buf[index+1]);
+		while(charsread > charsprocessed) {
+            datapoint = ntohs(buf.data[index]);
+			//datapoint = (buf[index] << 8 | buf[index+1]);
             switch(convert) {
             case CONVERT_VOLTS:
 				if(alignment <= 5) {
@@ -313,8 +330,9 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 			}
             
             //Each point is two bytes, so increment index and total bytes read
-			index++;
-			index++;
+			charsprocessed++;
+			charsprocessed++;
+            index++;
             alignment++;
 			//totalread++;
             
@@ -368,6 +386,7 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 			}
 		}
 		index = 0;
+        charsprocessed = 0;
 	}
 
 	return 0;
@@ -425,17 +444,27 @@ int nerd_open(const char *address,int port) {
 }
 
 //Generate an appropriate sample initiation command
-int nerd_generate_command(char * command, int * channel_list, int channel_count, int precision,
-    unsigned short period) {
+int nerd_generate_command(getPacket * command, int * channel_list, int channel_count, int precision,
+    unsigned long period) {
     
-    int channelbit = 0;
+    short channelbit = 0;
     int i;
     
     for( i = 0; i < channel_count; i++) {
         channelbit = channelbit | (0x1 << channel_list[i]);
     }
-
-    sprintf(command,"GETD%3.3X%d%5.5d", channelbit,precision,period);
+    
+    //command->word = "GETD";
+    command->word[0] = 'G';
+    command->word[1] = 'E';
+    command->word[2] = 'T';
+    command->word[3] = 'D';
+    command->channelbit = htons(channelbit);
+    command->precision = precision;
+    command->period = htonl(period);
+    command->prescaler = 0;
+    
+    //sprintf(command,"GETD%3.3X%d%5.5d", channelbit,precision,period);
     
     return 0;
     

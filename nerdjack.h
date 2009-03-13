@@ -24,16 +24,24 @@
 #define NERDJACK_PACKET_SIZE 1460
 #define NERDJACK_NUM_SAMPLES 724
 
+typedef struct __attribute__((__packed__)) {
+    char word[4];
+	unsigned short channelbit;
+	unsigned char precision;
+	unsigned long period;
+	unsigned char prescaler;
+} getPacket;
+
 /* Open/close TCP/IP connection to the NerdJack */
 int nerd_open(const char *address,int port);
 int nerd_close_conn(int data_fd);
 
 /* Generate the command word for the NerdJack */
-int nerd_generate_command(char * command, int * channel_list, int channel_count, int precision,
-    unsigned short period);
+int nerd_generate_command(getPacket * command, int * channel_list, int channel_count, int precision,
+    unsigned long period);
 
 /* Send given command to NerdJack */
-int nerd_send_command(const char * address, char * command);
+int nerd_send_command(const char * address, void * command, int length);
 
 /* Stream data out of the NerdJack */
 int nerd_data_stream(int data_fd, int numChannels, int * channel_list, int precision, int convert, int lines, int showmem, unsigned short * currentcount);
