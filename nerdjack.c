@@ -47,9 +47,11 @@ typedef struct __attribute__((__packed__)) {
    desired scanrate.  Returns -1 if no valid config found */
 int nerdjack_choose_scan(double desired_rate, double *actual_rate, unsigned long *period)
 {
-    //The +1 corrects a silicon bug.  The timer resets to 1, not 0.
-	*period = floor((double) NERDJACK_CLOCK_RATE / desired_rate) + 1;
-    if(*period > 0x0fffff) {
+    //The ffffe is because of a silicon bug.  The last bit is unusable in all
+    //devices so far.  It is worked around on the chip, but giving it exactly
+    //0xfffff would cause the workaround code to roll over.
+	*period = floor((double) NERDJACK_CLOCK_RATE / desired_rate);
+    if(*period > 0x0ffffe) {
         info("Cannot sample that slowly\n");
         *actual_rate = (double)NERDJACK_CLOCK_RATE / (double) 0x0ffffe;
         //info("Sampling at slowest rate:%f\n",*actual_rate);
