@@ -178,15 +178,47 @@ int nerd_send_command(const char * address, void * command, int length)
 }
 
 //Initialize the channel structure to distill how data should be displayed
-static int nerd_init_channels(deststruct * destination, int numChannels, int *channel_list) {
+static void nerd_init_channels(deststruct * destination, int numChannels, int numChannelsSampled, int *channel_list) {
 
-    int channels_left = numChannels;
+    //int channels_left = numChannels;
     int channelprocessing = 0;
     int currentalign = 0; //Index into sampled channels
     int i;
-    int numDuplicates = 0;
+    //int numDuplicates = 0;
 
     int tempdestlist[NERDJACK_CHANNELS];
+    
+    //Clear out destination stuff
+    for(i=0; i < numChannelsSampled;i++) {
+        destination[i].numCopies = 0;
+    }
+    
+
+    for(channelprocessing = 0; channelprocessing < numChannelsSampled; channelprocessing++) {
+        //Find out how many copies of each channel so we malloc the right things
+        currentalign = 0;
+        for(i = 0; i < numChannels; i++) {
+            if(channelprocessing == channel_list[i]) {
+                tempdestlist[currentalign] = i;
+                currentalign++;
+            }
+        }
+        
+        
+        
+        //If this channel is wanted, set it up.
+        if(currentalign > 0) {
+            destination[channelprocessing].numCopies = currentalign;
+            destination[channelprocessing].destlist = malloc( destination[channelprocessing].numCopies * sizeof(int) );
+            memcpy(destination[channelprocessing].destlist, tempdestlist, destination[channelprocessing].numCopies * sizeof(int) );
+        }
+    
+    }
+    
+    return;
+    
+    }
+/*
     
     //Loop through channel_list until all channels recognized
     //start with channelprocessing = 0 and increment through channels.
@@ -220,7 +252,7 @@ static int nerd_init_channels(deststruct * destination, int numChannels, int *ch
 return numDuplicates;
 
 }
-
+*/
 int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines, int showmem, unsigned short * currentcount)
 {
     //Variables that should persist across retries
@@ -235,7 +267,6 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
     unsigned short dataline[NERDJACK_CHANNELS];
     long double voltline[NERDJACK_CHANNELS];
     int i;
-    deststruct destination[NERDJACK_CHANNELS];
 
     
     unsigned long memused = 0;
@@ -254,11 +285,22 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
     }
     
     
-    int numDuplicates = nerd_init_channels(destination,numChannels, channel_list);
+    int numChannelsSampled = channel_list[0] + 1;
+    
+    //The number sampled will be the highest channel requested plus 1 (i.e. channel 0 requested means 1 sampled)
+    for(i = 0; i < numChannels; i++) {
+       if (channel_list[i] + 1 > numChannelsSampled)
+           numChannelsSampled = channel_list[i] + 1;
+    }
+    
+    deststruct destination[numChannelsSampled];
+
+    nerd_init_channels(destination,numChannels,numChannelsSampled, channel_list);
+    
     
     //Now destination structure array is set as well as numDuplicates.
 
-    int numChannelsSampled = numChannels - numDuplicates;
+    //int numChannelsSampled = numChannels - numDuplicates;
     int numGroups = NERDJACK_NUM_SAMPLES / numChannelsSampled;
 
 
@@ -313,6 +355,7 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 		while(charsread > charsprocessed) {
             datapoint = ntohs(buf.data[index]);
 			//datapoint = (buf[index] << 8 | buf[index+1]);
+            if(destination[alignment].numCopies != 0) {
             switch(convert) {
             case CONVERT_VOLTS:
 				if(alignment <= 5) {
@@ -333,6 +376,8 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
                 }
                 break;
 			}
+            
+            }
             
             //Each point is two bytes, so increment index and total bytes read
 			charsprocessed++;
