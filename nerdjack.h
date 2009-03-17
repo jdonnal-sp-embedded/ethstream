@@ -51,6 +51,6 @@ int nerdjack_detect(char * ipAddress);
 
 /* Choose the best ScanConfig and ScanInterval parameters for the
    desired scanrate.  Returns -1 if no valid config found */
-int nerdjack_choose_scan(double desired_rate, double *actual_rate, int *period);
+int nerdjack_choose_scan(double desired_rate, double *actual_rate, unsigned long *period);
 
 #endif

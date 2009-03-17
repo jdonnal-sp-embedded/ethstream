@@ -45,16 +45,21 @@ typedef struct __attribute__((__packed__)) {
 
 /* Choose the best ScanConfig and ScanInterval parameters for the
    desired scanrate.  Returns -1 if no valid config found */
-int nerdjack_choose_scan(double desired_rate, double *actual_rate, int *period)
+int nerdjack_choose_scan(double desired_rate, double *actual_rate, unsigned long *period)
 {
-    
-	*period = floor((double) NERDJACK_CLOCK_RATE / desired_rate);
-    if(*period > UINT16_MAX) {
+    //The +1 corrects a silicon bug.  The timer resets to 1, not 0.
+	*period = floor((double) NERDJACK_CLOCK_RATE / desired_rate) + 1;
+    if(*period > 0x0fffff) {
         info("Cannot sample that slowly\n");
+        *actual_rate = (double)NERDJACK_CLOCK_RATE / (double) 0x0ffffe;
+        //info("Sampling at slowest rate:%f\n",*actual_rate);
+        
         return -1;
     }
-    *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) *period;
+    //Period holds the period register for the NerdJack, so it needs to be right
+    *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) (*period - 1);
 	if(*actual_rate != desired_rate) {
+        //info("Sampling at nearest rate:%f\n",*actual_rate);
 		return -1;
 	}
     return 0;

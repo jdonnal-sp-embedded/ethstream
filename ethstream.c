@@ -65,7 +65,7 @@ struct options opt[] = {
 int doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	     int *channel_list, int channel_count, int convert, int maxlines);
 int nerdDoStream(const char *address, int *channel_list, int channel_count, int precision, 
-            unsigned short period, int convert, int lines, int showmem);
+            unsigned long period, int convert, int lines, int showmem);
 int data_callback(int channels, uint16_t *data, void *context);
 
 int columns_left = 0;
@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
     int nerdjack = 0;
     int detect = 0;
     int precision = 0;
-    int period = NERDJACK_CLOCK_RATE / desired_rate;
+    unsigned long period = NERDJACK_CLOCK_RATE / desired_rate;
 
 	/* Parse arguments */
 	opt_init(&optind);
@@ -277,20 +277,23 @@ int main(int argc, char *argv[])
         if (nerdjack_choose_scan(desired_rate, &actual_rate, &period) < 0) {
             info("error: can't achieve requested scan rate (%lf Hz)\n",
                 desired_rate);
-            return 1;
+            //return 1;
         }
     } else {
         if (ue9_choose_scan(desired_rate, &actual_rate, 
                     &scanconfig, &scaninterval) < 0) {
             info("error: can't achieve requested scan rate (%lf Hz)\n",
                 desired_rate);
-            return 1;
+            //return 1;
         }
     }
     
 
-	if ((desired_rate != actual_rate) || verb_count)
+	if ((desired_rate != actual_rate) || verb_count){
 		info("Actual scanrate is %lf Hz\n", actual_rate);
+        info("Period is %ld\n",period);
+    }
+        
 
 	if (verb_count && lines) {
 		info("Stopping capture after %d lines\n", lines);
@@ -354,7 +357,7 @@ int main(int argc, char *argv[])
 }
 
 int nerdDoStream(const char *address, int *channel_list, int channel_count, int precision, 
-            unsigned short period, int convert, int lines, int showmem)
+            unsigned long period, int convert, int lines, int showmem)
 {
 	int retval = -EAGAIN;
 	int fd_data;
