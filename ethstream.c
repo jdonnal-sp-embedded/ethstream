@@ -410,7 +410,7 @@ int nerdDoStream(const char *address, int *channel_list, int channel_count, int 
         goto out;
 	}
     
-    if (nerd_data_stream(fd_data, channel_count, channel_list, precision, convert, lines, showmem, &currentcount) < 0) {
+    if (nerd_data_stream(fd_data, channel_count, channel_list, precision, convert, lines, showmem, &currentcount,period) < 0) {
         info("Failed to open data stream\n");
         goto out1;
     }

@@ -54,12 +54,13 @@ int nerdjack_choose_scan(double desired_rate, double *actual_rate, unsigned long
     if(*period > 0x0ffffe) {
         info("Cannot sample that slowly\n");
         *actual_rate = (double)NERDJACK_CLOCK_RATE / (double) 0x0ffffe;
+        *period = 0x0ffffe;
         //info("Sampling at slowest rate:%f\n",*actual_rate);
         
         return -1;
     }
     //Period holds the period register for the NerdJack, so it needs to be right
-    *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) (*period - 1);
+    *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) *period;
 	if(*actual_rate != desired_rate) {
         //info("Sampling at nearest rate:%f\n",*actual_rate);
 		return -1;
@@ -182,12 +183,9 @@ int nerd_send_command(const char * address, void * command, int length)
 //Initialize the channel structure to distill how data should be displayed
 static void nerd_init_channels(deststruct * destination, int numChannels, int numChannelsSampled, int *channel_list) {
 
-    //int channels_left = numChannels;
     int channelprocessing = 0;
     int currentalign = 0; //Index into sampled channels
     int i;
-    //int numDuplicates = 0;
-
     int tempdestlist[NERDJACK_CHANNELS];
     
     //Clear out destination stuff
@@ -219,43 +217,9 @@ static void nerd_init_channels(deststruct * destination, int numChannels, int nu
     
     return;
     
-    }
-/*
-    
-    //Loop through channel_list until all channels recognized
-    //start with channelprocessing = 0 and increment through channels.
-    //If a channel is found in the list set it up appropriately.
-    //The complication arises because we want to allow a channel to
-    //display more than once or even out of order
-    //We need to distill a duplicate-free list of channels in order to
-    //sample as well as a mapping of how to print those channels
-    //to screen.
-    do {
-        destination[currentalign].numCopies = 0;
-        for(i = 0; i < numChannels; i++) {
-            if(channelprocessing == channel_list[i]) {
-                tempdestlist[destination[currentalign].numCopies] = i;
-                if(destination[currentalign].numCopies > 0) {
-                    numDuplicates++;
-                }
-                destination[currentalign].numCopies++;
-                channels_left--;
-            }
-        }
-        
-        if(destination[currentalign].numCopies > 0) {
-            destination[currentalign].destlist = malloc( destination[currentalign].numCopies * sizeof(int) );
-            memcpy(destination[currentalign].destlist, tempdestlist, destination[currentalign].numCopies * sizeof(int));
-            currentalign++;
-        }
-        channelprocessing++;
-    } while(channels_left > 0);
-
-return numDuplicates;
-
 }
-*/
-int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines, int showmem, unsigned short * currentcount)
+
+int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precision, int convert, int lines, int showmem, unsigned short * currentcount, unsigned int period)
 {
     //Variables that should persist across retries
     static dataPacket buf;
@@ -279,6 +243,8 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 
 	int numgroups = 0;
 	long double volts;
+
+    unsigned int expectedtimeout = (period * NERDJACK_NUM_SAMPLES / NERDJACK_CLOCK_RATE) + 2;
     
     //Check to see if we're trying to resume
     //Don't blow away linesleft in that case
@@ -308,13 +274,13 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 
 	//Loop forever to grab data
     while((charsread = recv_all_timeout(data_fd,&buf,NERDJACK_PACKET_SIZE,0,
-           & (struct timeval) { .tv_sec = NERDJACK_TIMEOUT }))){
+           & (struct timeval) { .tv_sec = expectedtimeout }))){
 
 		//We want a complete packet, so take the chars so far and keep waiting
 		if(charsread != NERDJACK_PACKET_SIZE) {
             //There was a problem getting data.  Probably a closed
             //connection.
-		    info("Packet was too short\n");
+		    info("Packet timed out or was too short\n");
 	            return -2;
 		}
 
@@ -338,11 +304,8 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
         //Process the rest of the header and update the index value to be pointing after it
 		charsprocessed = 12;
         memused = ntohl(buf.lwipmemoryused);
-		//memused = (buf[4] << 24) | (buf[5] << 16) | (buf[6] << 8) | (buf[7]);
         adcused = ntohs(buf.adcused);
-		//adcused = (buf[8] << 8) | (buf[9]);
         packetsready = ntohs(buf.packetsready);
-		//packetsready = (buf[10] << 8) | (buf[11]);
 		alignment = 0;
 		numgroups = 0;
 
@@ -356,7 +319,6 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
         //use the destination structure to load the line before printing
 		while(charsread > charsprocessed) {
             datapoint = ntohs(buf.data[index]);
-			//datapoint = (buf[index] << 8 | buf[index+1]);
             if(destination[alignment].numCopies != 0) {
             switch(convert) {
             case CONVERT_VOLTS:
@@ -386,10 +348,6 @@ int nerd_data_stream(int data_fd, int numChannels, int *channel_list, int precis
 			charsprocessed++;
             index++;
             alignment++;
-			//totalread++;
-            
-            
-			
             
             //Since channel data is packed, we need to know when to insert a newline
 			if(alignment == numChannelsSampled){
