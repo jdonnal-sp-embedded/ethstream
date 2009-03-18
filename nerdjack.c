@@ -200,7 +200,7 @@ nerd_send_command (const char *address, void *command, int length)
   if (0 != strcmp ("OK", buf))
     {
       verb ("Did not receive OK.  Received %s\n", buf);
-      return -3;
+      return -1;
     }
 
   return 0;
@@ -480,7 +480,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
 bad:
   info ("Output error (disk full?)\n");
-  return -1;
+  return -3;
 
 }
 

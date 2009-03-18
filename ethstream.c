@@ -477,9 +477,14 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
       goto out;
     }
 
-  if (nerd_data_stream
+  retval = nerd_data_stream
       (fd_data, channel_count, channel_list, precision, convert, lines,
-       showmem, &currentcount, period) < 0)
+       showmem, &currentcount, period);
+  if(retval == -3)
+  {
+      retval = 0;
+  }
+  if(retval < 0) 
     {
       info ("Failed to open data stream\n");
       goto out1;
@@ -627,5 +632,5 @@ data_callback (int channels, uint16_t * data, void *context)
 
 bad:
   info ("Output error (disk full?)\n");
-  return -1;
+  return -3;
 }
