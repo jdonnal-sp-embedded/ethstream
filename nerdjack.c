@@ -309,6 +309,14 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
   nerd_init_channels (destination, numChannels, numChannelsSampled,
 		      channel_list);
 
+  if (linesdumped == 0)
+    {
+      if (period < (numChannelsSampled * 100 + 300))
+	{
+	  info ("You are sampling close to the limit of NerdJack\n");
+	  info ("Sample fewer channels or sample slower\n");
+	}
+    }
 
   //Now destination structure array is set as well as numDuplicates.
 
