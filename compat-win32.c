@@ -3,55 +3,83 @@
 #include "compat.h"
 #include <windows.h>
 
-unsigned int sleep(unsigned int seconds)
+unsigned int
+sleep (unsigned int seconds)
 {
-	Sleep(seconds * 1000);
-	return 0;
+  Sleep (seconds * 1000);
+  return 0;
 }
 
-static struct {
-	int num;
-	char *msg;
-} win32_error[] = {
-	/* Errors that we might vaguely expect to see */
-	{ WSAEINTR, "Winsock: Interrupted system call" },
-	{ WSAEBADF, "Winsock: Bad file number" },
-	{ WSAEFAULT, "Winsock: Bad address" },
-	{ WSAEINVAL, "Winsock: Invalid argument" },
-	{ WSAEMFILE, "Winsock: Too many open files" },
-	{ WSAEWOULDBLOCK, "Winsock: Operation would block" },
-	{ WSAEINPROGRESS, "Winsock: Operation now in progress" },
-	{ WSAEALREADY, "Winsock: Operation already in progress" },
-	{ WSAENOTSOCK, "Winsock: Socket operation on nonsocket" },
-	{ WSAEADDRINUSE, "Winsock: Address already in use" },
-	{ WSAEADDRNOTAVAIL, "Winsock: Cannot assign requested address" },
-	{ WSAENETDOWN, "Winsock: Network is down" },
-	{ WSAENETUNREACH, "Winsock: Network is unreachable" },
-	{ WSAENETRESET, "Winsock: Network dropped connection on reset" },
-	{ WSAECONNABORTED, "Winsock: Software caused connection abort" },
-	{ WSAECONNRESET, "Winsock: Connection reset by peer" },
-	{ WSAETIMEDOUT, "Winsock: Connection timed out" },
-	{ WSAECONNREFUSED, "Winsock: Connection refused" },
-	{ WSAEHOSTDOWN, "Winsock: Host is down" },
-	{ WSAEHOSTUNREACH, "Winsock: No route to host" },
-	{ WSAVERNOTSUPPORTED, "Winsock: Unsupported Winsock version" },
-	{ ETIMEDOUT, "Connection timed out" },
-	{ ENOTCONN, "Not connected" },
-	{ -1, NULL },
-};
-char *compat_strerror(int errnum)
+static struct
 {
-	int i;
-	static char buf[128];
-	
-	for (i = 0; win32_error[i].num != -1; i++)
-		if (errnum == win32_error[i].num)
-			return win32_error[i].msg;
-	if (errnum >= 10000) {
-		sprintf(buf, "Winsock: unknown error %d\n", errnum);
-		return buf;
-	}
-	return strerror(errnum);
+  int num;
+  char *msg;
+} win32_error[] =
+{
+  /* Errors that we might vaguely expect to see */
+  {
+  WSAEINTR, "Winsock: Interrupted system call"},
+  {
+  WSAEBADF, "Winsock: Bad file number"},
+  {
+  WSAEFAULT, "Winsock: Bad address"},
+  {
+  WSAEINVAL, "Winsock: Invalid argument"},
+  {
+  WSAEMFILE, "Winsock: Too many open files"},
+  {
+  WSAEWOULDBLOCK, "Winsock: Operation would block"},
+  {
+  WSAEINPROGRESS, "Winsock: Operation now in progress"},
+  {
+  WSAEALREADY, "Winsock: Operation already in progress"},
+  {
+  WSAENOTSOCK, "Winsock: Socket operation on nonsocket"},
+  {
+  WSAEADDRINUSE, "Winsock: Address already in use"},
+  {
+  WSAEADDRNOTAVAIL, "Winsock: Cannot assign requested address"},
+  {
+  WSAENETDOWN, "Winsock: Network is down"},
+  {
+  WSAENETUNREACH, "Winsock: Network is unreachable"},
+  {
+  WSAENETRESET, "Winsock: Network dropped connection on reset"},
+  {
+  WSAECONNABORTED, "Winsock: Software caused connection abort"},
+  {
+  WSAECONNRESET, "Winsock: Connection reset by peer"},
+  {
+  WSAETIMEDOUT, "Winsock: Connection timed out"},
+  {
+  WSAECONNREFUSED, "Winsock: Connection refused"},
+  {
+  WSAEHOSTDOWN, "Winsock: Host is down"},
+  {
+  WSAEHOSTUNREACH, "Winsock: No route to host"},
+  {
+  WSAVERNOTSUPPORTED, "Winsock: Unsupported Winsock version"},
+  {
+  ETIMEDOUT, "Connection timed out"},
+  {
+  ENOTCONN, "Not connected"},
+  {
+-1, NULL},};
+char *
+compat_strerror (int errnum)
+{
+  int i;
+  static char buf[128];
+
+  for (i = 0; win32_error[i].num != -1; i++)
+    if (errnum == win32_error[i].num)
+      return win32_error[i].msg;
+  if (errnum >= 10000)
+    {
+      sprintf (buf, "Winsock: unknown error %d\n", errnum);
+      return buf;
+    }
+  return strerror (errnum);
 }
 
 #ifdef __WIN32__
@@ -80,4 +108,3 @@ char *compat_strerror(int errnum)
 }
 */
 #endif
-
