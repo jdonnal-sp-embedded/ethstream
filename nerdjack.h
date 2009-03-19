@@ -24,6 +24,7 @@
 #define NERDJACK_PACKET_SIZE 1460
 #define NERDJACK_NUM_SAMPLES 724
 
+/* Packet structure used in message to start sampling on NerdJack */
 typedef struct __attribute__ ((__packed__))
 {
   char word[4];

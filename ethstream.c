@@ -141,12 +141,12 @@ main (int argc, char *argv[])
 	      tmp = strtol (optarg, &endp, 0);
 	      if (*endp != '\0' && *endp != ',')
 		{
-		  //|| tmp < 0 || tmp >= UE9_CHANNELS) {
 		  info ("bad channel number: %s\n", optarg);
 		  goto printhelp;
 		}
 	      //We do not want to overflow channel_list, so we need the check here
-	      //The rest of the sanity checking can come later after we know whether this is a 
+	      //The rest of the sanity checking can come later after we know
+          //whether this is a 
 	      //LabJack or a NerdJack
 #if UE9_CHANNELS > NERDJACK_CHANNELS
 	      if (channel_count >= UE9_CHANNELS)
@@ -225,8 +225,9 @@ main (int argc, char *argv[])
 	  verb_count++;
 	  break;
 	case 'V':
-	  printf ("ljstream " VERSION "\n");
+	  printf ("etherstream " VERSION "\n");
 	  printf ("Written by Jim Paris <jim@jtan.com>\n");
+      printf ("and Zachary Clifford <zacharyc@mit.edu>\n");
 	  printf ("This program comes with no warranty and is "
 		  "provided under the GPLv2.\n");
 	  return 0;
@@ -315,7 +316,6 @@ doneparse:
 	{
 	  info ("error: can't achieve requested scan rate (%lf Hz)\n",
 		desired_rate);
-	  //return 1;
 	}
     }
   else
@@ -325,7 +325,6 @@ doneparse:
 	{
 	  info ("error: can't achieve requested scan rate (%lf Hz)\n",
 		desired_rate);
-	  //return 1;
 	}
     }
 
@@ -425,9 +424,9 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
   getPacket command;
   static unsigned short currentcount = 0;
 
-  //usleep(1000000);
-
-  if (first_call)
+  //If this is the first time, set up acquisition
+  //Otherwise try to resume the previous one
+  if (started == 0)
     {
       if (nerd_generate_command
 	  (&command, channel_list, channel_count, precision, period) < 0)
@@ -435,7 +434,6 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
 	  info ("Failed to create configuration command\n");
 	  goto out;
 	}
-
 
       if (nerd_send_command (address, "STOP", 4) < 0)
 	{
@@ -445,28 +443,34 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
 	  goto out;
 	}
 
+  //We've tried communicating, so this is not the first call anymore
+  first_call = 0;
+
       if (nerd_send_command (address, &command, sizeof (command)) < 0)
 	{
 	  info ("Failed to send GET command\n");
 	  goto out;
 	}
-    }
-  //We have sent the configuration commands.  If we retry later, don't resend them.  We would like
-  //to resume the interrupted transmission   
-  first_call = 0;
-
+    } else {
   //If we had a transmission in progress, send a command to resume from there
-  if (started == 1)
-    {
       char cmdbuf[10];
       sprintf (cmdbuf, "SETC%05hd", currentcount);
-      if (nerd_send_command (address, cmdbuf, strlen (cmdbuf)) < 0)
-	{
-	  info ("Failed to send SETC command\n");
-	  goto out;
+      retval = nerd_send_command (address, cmdbuf, strlen (cmdbuf));
+      if(retval == -4) {
+          info("NerdJack was reset\n");
+          //Assume we have not started yet, reset on this side.
+          //If this routine is retried, start over
+          printf("# NerdJack was reset here\n");
+          currentcount = 0;
+          started = 0;
+          goto out;
+      } else if(retval < 0) {
+	      info ("Failed to send SETC command\n");
+	      goto out;
 	}
     }
 
+  //The transmission has begun
   started = 1;
 
   /* Open connection */

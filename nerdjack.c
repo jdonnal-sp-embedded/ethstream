@@ -60,20 +60,20 @@ nerdjack_choose_scan (double desired_rate, double *actual_rate,
       info ("Cannot sample that slowly\n");
       *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) 0x0ffffe;
       *period = 0x0ffffe;
-      //info("Sampling at slowest rate:%f\n",*actual_rate);
-
       return -1;
     }
   //Period holds the period register for the NerdJack, so it needs to be right
   *actual_rate = (double) NERDJACK_CLOCK_RATE / (double) *period;
   if (*actual_rate != desired_rate)
     {
-      //info("Sampling at nearest rate:%f\n",*actual_rate);
       return -1;
     }
   return 0;
 }
 
+/* Perform autodetection.  Returns 0 on success, -1 on error
+ * Sets ipAddress to the detected address
+ */
 int
 nerdjack_detect (char *ipAddress)
 {
@@ -163,6 +163,10 @@ nerdjack_detect (char *ipAddress)
   return 0;
 }
 
+/* Send the given command to address.  The command should be something
+ * of the specified length.  This expects the NerdJack to reply with OK
+ * or NO
+ */
 int
 nerd_send_command (const char *address, void *command, int length)
 {
@@ -200,13 +204,15 @@ nerd_send_command (const char *address, void *command, int length)
   if (0 != strcmp ("OK", buf))
     {
       verb ("Did not receive OK.  Received %s\n", buf);
-      return -1;
+      return -4;
     }
 
   return 0;
 }
 
-//Initialize the channel structure to distill how data should be displayed
+/*
+ * Initialize the channel structure to distill how data should be displayed
+ */
 static void
 nerd_init_channels (deststruct * destination, int numChannels,
 		    int numChannelsSampled, int *channel_list)
@@ -237,8 +243,6 @@ nerd_init_channels (deststruct * destination, int numChannels,
 	      currentalign++;
 	    }
 	}
-
-
 
       //If this channel is wanted, set it up.
       if (currentalign > 0)
@@ -283,7 +287,9 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
   int numgroups = 0;
   long double volts;
-
+  
+  //The timeout should be the expected time plus two seconds
+  //This permits slower speeds to work properly
   unsigned int expectedtimeout =
     (period * NERDJACK_NUM_SAMPLES / NERDJACK_CLOCK_RATE) + 2;
 
@@ -297,7 +303,8 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
   int numChannelsSampled = channel_list[0] + 1;
 
-  //The number sampled will be the highest channel requested plus 1 (i.e. channel 0 requested means 1 sampled)
+  //The number sampled will be the highest channel requested plus 1
+  //(i.e. channel 0 requested means 1 sampled)
   for (i = 0; i < numChannels; i++)
     {
       if (channel_list[i] + 1 > numChannelsSampled)
@@ -309,6 +316,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
   nerd_init_channels (destination, numChannels, numChannelsSampled,
 		      channel_list);
 
+  //If this is the first time called, warn the user if we're too fast
   if (linesdumped == 0)
     {
       if (period < (numChannelsSampled * 100 + 300))
@@ -320,7 +328,6 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
   //Now destination structure array is set as well as numDuplicates.
 
-  //int numChannelsSampled = numChannels - numDuplicates;
   int numGroups = NERDJACK_NUM_SAMPLES / numChannelsSampled;
 
 
@@ -332,7 +339,6 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 			    .tv_sec = expectedtimeout})))
     {
 
-      //We want a complete packet, so take the chars so far and keep waiting
       if (charsread != NERDJACK_PACKET_SIZE)
 	{
 	  //There was a problem getting data.  Probably a closed
@@ -350,7 +356,6 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
       //Check counter info to make sure not out of order
       tempshort = ntohs (buf.packetNumber);
-      //tempshort = (buf[2] << 8) | buf[3];
       if (tempshort != *currentcount)
 	{
 	  info ("Count wrong. Expected %hd but got %hd\n", *currentcount,
@@ -425,6 +430,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 	  //Since channel data is packed, we need to know when to insert a newline
 	  if (alignment == numChannelsSampled)
 	    {
+          //We want to dump the first line because it's usually spurious
 	      if (linesdumped != 0)
 		{
 		  switch (convert)
@@ -492,6 +498,7 @@ bad:
 
 }
 
+/* Open a connection to the NerdJack */
 int
 nerd_open (const char *address, int port)
 {
@@ -560,7 +567,6 @@ nerd_generate_command (getPacket * command, int *channel_list,
       channelbit = channelbit | (0x1 << channel_list[i]);
     }
 
-  //command->word = "GETD";
   command->word[0] = 'G';
   command->word[1] = 'E';
   command->word[2] = 'T';
@@ -569,8 +575,6 @@ nerd_generate_command (getPacket * command, int *channel_list,
   command->precision = precision;
   command->period = htonl (period);
   command->prescaler = 0;
-
-  //sprintf(command,"GETD%3.3X%d%5.5d", channelbit,precision,period);
 
   return 0;
 
@@ -583,3 +587,4 @@ nerd_close_conn (int data_fd)
   close (data_fd);
   return 0;
 }
+
