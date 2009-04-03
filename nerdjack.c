@@ -375,7 +375,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
       numgroups = 0;
 
       if(memused) {
-          printf("#Packet lost");
+          printf("#Packet lost\n");
           continue;
       }
 
