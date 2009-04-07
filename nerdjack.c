@@ -39,7 +39,6 @@ typedef struct __attribute__ ((__packed__))
   unsigned char headerone;
   unsigned char headertwo;
   unsigned short packetNumber;
-  unsigned long lwipmemoryused;
   unsigned short adcused;
   unsigned short packetsready;
   signed short data[NERDJACK_NUM_SAMPLES];
@@ -263,7 +262,8 @@ nerd_init_channels (deststruct * destination, int numChannels,
 int
 nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 		  int precision, int convert, int lines, int showmem,
-		  unsigned short *currentcount, unsigned int period)
+		  unsigned short *currentcount, unsigned int period,
+                  int wasreset)
 {
   //Variables that should persist across retries
   static dataPacket buf;
@@ -279,7 +279,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
   int i;
 
 
-  unsigned long memused = 0;
+  //unsigned long memused = 0;
   unsigned short packetsready = 0;
   unsigned short adcused = 0;
   unsigned short tempshort = 0;
@@ -299,6 +299,10 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
     {
       linesleft = lines;
     }
+
+  if(wasreset) {
+    linesdumped = 0;
+  }
 
 
   int numChannelsSampled = channel_list[0] + 1;
@@ -368,20 +372,20 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
       //Process the rest of the header and update the index value to be pointing after it
       charsprocessed = 12;
-      memused = ntohl (buf.lwipmemoryused);
+      //memused = ntohl (buf.lwipmemoryused);
       adcused = ntohs (buf.adcused);
       packetsready = ntohs (buf.packetsready);
       alignment = 0;
       numgroups = 0;
 
-      if(memused) {
-          printf("#Packet lost\n");
-          continue;
-      }
+      //if(memused) {
+      //    printf("#Packet lost\n");
+      //    continue;
+      //}
 
       if (showmem)
 	{
-	  printf ("%lX %hd %hd\n", memused, adcused, packetsready);
+	  printf ("%hd %hd\n", adcused, packetsready);
 	  continue;
 	}
 

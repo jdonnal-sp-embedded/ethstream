@@ -16,13 +16,13 @@
 #include "netutil.h"
 
 #define NERDJACK_CHANNELS 12
-#define NERDJACK_CLOCK_RATE 54000000
+#define NERDJACK_CLOCK_RATE 66000000
 #define NERDJACK_DATA_PORT 49155
 #define NERDJACK_UDP_RECEIVE_PORT 49156
 #define NERDJACK_COMMAND_PORT 49157
 
 #define NERDJACK_PACKET_SIZE 1460
-#define NERDJACK_NUM_SAMPLES 724
+#define NERDJACK_NUM_SAMPLES 726
 
 /* Packet structure used in message to start sampling on NerdJack */
 typedef struct __attribute__ ((__packed__))
@@ -49,7 +49,8 @@ int nerd_send_command (const char *address, void *command, int length);
 /* Stream data out of the NerdJack */
 int nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 		      int precision, int convert, int lines, int showmem,
-		      unsigned short *currentcount, unsigned int period);
+		      unsigned short *currentcount, unsigned int period,
+                      int wasreset);
 
 /* Detect the IP Address of the NerdJack and return in ipAddress */
 int nerdjack_detect (char *ipAddress);

@@ -421,6 +421,7 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
   int fd_data;
   static int first_call = 1;
   static int started = 0;
+  static int wasreset = 0;
   getPacket command;
   static unsigned short currentcount = 0;
 
@@ -463,6 +464,7 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
           printf("# NerdJack was reset here\n");
           currentcount = 0;
           started = 0;
+          wasreset = 1;
           goto out;
       } else if(retval < 0) {
 	      info ("Failed to send SETC command\n");
@@ -483,7 +485,8 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
 
   retval = nerd_data_stream
       (fd_data, channel_count, channel_list, precision, convert, lines,
-       showmem, &currentcount, period);
+       showmem, &currentcount, period, wasreset);
+  wasreset = 0;
   if(retval == -3)
   {
       retval = 0;
