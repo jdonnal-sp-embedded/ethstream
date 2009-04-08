@@ -16,7 +16,7 @@
 #include "netutil.h"
 
 #define NERDJACK_CHANNELS 12
-#define NERDJACK_CLOCK_RATE 66000000
+#define NERDJACK_CLOCK_RATE 54000000
 #define NERDJACK_DATA_PORT 49155
 #define NERDJACK_UDP_RECEIVE_PORT 49156
 #define NERDJACK_COMMAND_PORT 49157
@@ -28,9 +28,9 @@
 typedef struct __attribute__ ((__packed__))
 {
   char word[4];
+  unsigned long period;
   unsigned short channelbit;
   unsigned char precision;
-  unsigned long period;
   unsigned char prescaler;
 } getPacket;
 
