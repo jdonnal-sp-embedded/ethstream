@@ -34,6 +34,8 @@ typedef struct
   int *destlist;
 } deststruct;
 
+#define NERD_HEADER_SIZE 8
+
 typedef struct __attribute__ ((__packed__))
 {
   unsigned char headerone;
@@ -371,7 +373,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
       *currentcount = *currentcount + 1;
 
       //Process the rest of the header and update the index value to be pointing after it
-      charsprocessed = 12;
+      charsprocessed = NERD_HEADER_SIZE;
       //memused = ntohl (buf.lwipmemoryused);
       adcused = ntohs (buf.adcused);
       packetsready = ntohs (buf.packetsready);
@@ -570,11 +572,19 @@ nerd_generate_command (getPacket * command, int *channel_list,
 
   short channelbit = 0;
   int i;
+  int highestchannel = 0;
 
   for (i = 0; i < channel_count; i++)
     {
-      channelbit = channelbit | (0x1 << channel_list[i]);
+      if (channel_list[i] > highestchannel) {
+         highestchannel = channel_list[i];
+      } 
+      //channelbit = channelbit | (0x1 << channel_list[i]);
     }
+
+  for( i = 0; i <= highestchannel; i++) {
+    channelbit = channelbit | (0x01 << i);
+  }
 
   command->word[0] = 'G';
   command->word[1] = 'E';
