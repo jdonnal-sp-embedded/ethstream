@@ -325,7 +325,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
   //If this is the first time called, warn the user if we're too fast
   if (linesdumped == 0)
     {
-      if (period < (numChannelsSampled * 100 + 300))
+      if (period < (numChannelsSampled * 200 + 600))
 	{
 	  info ("You are sampling close to the limit of NerdJack\n");
 	  info ("Sample fewer channels or sample slower\n");
