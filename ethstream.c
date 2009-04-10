@@ -424,6 +424,7 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
   static int wasreset = 0;
   getPacket command;
   static unsigned short currentcount = 0;
+tryagain:
 
   //If this is the first time, set up acquisition
   //Otherwise try to resume the previous one
@@ -465,7 +466,7 @@ nerdDoStream (const char *address, int *channel_list, int channel_count,
           currentcount = 0;
           started = 0;
           wasreset = 1;
-          goto out;
+          goto tryagain;
       } else if(retval < 0) {
 	      info ("Failed to send SETC command\n");
 	      goto out;
