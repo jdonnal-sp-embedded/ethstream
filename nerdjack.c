@@ -27,13 +27,6 @@
 
 #define NERDJACK_TIMEOUT 5	/* Timeout for connect/send/recv, in seconds */
 
-//Struct holding information about how channels should be reordered for output
-typedef struct
-{
-  int numCopies;
-  int *destlist;
-} deststruct;
-
 #define NERD_HEADER_SIZE 8
 
 typedef struct __attribute__ ((__packed__))
@@ -211,85 +204,45 @@ nerd_send_command (const char *address, void *command, int length)
   return 0;
 }
 
-/*
- * Initialize the channel structure to distill how data should be displayed
- */
-static void
-nerd_init_channels (deststruct * destination, int numChannels,
-		    int numChannelsSampled, int *channel_list)
-{
-
-  int channelprocessing = 0;
-  int currentalign = 0;		//Index into sampled channels
-  int i;
-  int tempdestlist[NERDJACK_CHANNELS];
-
-  //Clear out destination stuff
-  for (i = 0; i < numChannelsSampled; i++)
-    {
-      destination[i].numCopies = 0;
-    }
-
-
-  for (channelprocessing = 0; channelprocessing < numChannelsSampled;
-       channelprocessing++)
-    {
-      //Find out how many copies of each channel so we malloc the right things
-      currentalign = 0;
-      for (i = 0; i < numChannels; i++)
-	{
-	  if (channelprocessing == channel_list[i])
-	    {
-	      tempdestlist[currentalign] = i;
-	      currentalign++;
-	    }
-	}
-
-      //If this channel is wanted, set it up.
-      if (currentalign > 0)
-	{
-	  destination[channelprocessing].numCopies = currentalign;
-	  destination[channelprocessing].destlist =
-	    malloc (destination[channelprocessing].numCopies * sizeof (int));
-	  memcpy (destination[channelprocessing].destlist, tempdestlist,
-		  destination[channelprocessing].numCopies * sizeof (int));
-	}
-
-    }
-
-  return;
-
-}
 
 int
 nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 		  int precision, int convert, int lines, int showmem,
 		  unsigned short *currentcount, unsigned int period,
-                  int wasreset)
+		  int wasreset)
 {
   //Variables that should persist across retries
   static dataPacket buf;
   static int linesleft = 0;
   static int linesdumped = 0;
 
-  int index = 0;
-  int charsprocessed = 0;
-  int alignment = 0;
+  //Variables essential to packet processing
   signed short datapoint = 0;
-  unsigned short dataline[NERDJACK_CHANNELS];
-  long double voltline[NERDJACK_CHANNELS];
   int i;
 
+  int numChannelsSampled = channel_list[0] + 1;
 
-  //unsigned long memused = 0;
+  //The number sampled will be the highest channel requested plus 1
+  //(i.e. channel 0 requested means 1 sampled)
+  for (i = 0; i < numChannels; i++)
+    {
+      if (channel_list[i] + 1 > numChannelsSampled)
+	numChannelsSampled = channel_list[i] + 1;
+    }
+
+
+  long double voltline[numChannels];
+
+  unsigned short dataline[numChannels];
+
   unsigned short packetsready = 0;
   unsigned short adcused = 0;
   unsigned short tempshort = 0;
   int charsread = 0;
 
-  int numgroups = 0;
+  int numgroupsProcessed = 0;
   long double volts;
-  
+
   //The timeout should be the expected time plus two seconds
   //This permits slower speeds to work properly
   unsigned int expectedtimeout =
@@ -302,25 +255,11 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
       linesleft = lines;
     }
 
-  if(wasreset) {
-    linesdumped = 0;
-  }
-
-
-  int numChannelsSampled = channel_list[0] + 1;
-
-  //The number sampled will be the highest channel requested plus 1
-  //(i.e. channel 0 requested means 1 sampled)
-  for (i = 0; i < numChannels; i++)
+  //If there was a reset, we still need to dump a line because of faulty PDCA start
+  if (wasreset)
     {
-      if (channel_list[i] + 1 > numChannelsSampled)
-	numChannelsSampled = channel_list[i] + 1;
+      linesdumped = 0;
     }
-
-  deststruct destination[numChannelsSampled];
-
-  nerd_init_channels (destination, numChannels, numChannelsSampled,
-		      channel_list);
 
   //If this is the first time called, warn the user if we're too fast
   if (linesdumped == 0)
@@ -334,7 +273,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 
   //Now destination structure array is set as well as numDuplicates.
 
-  int numGroups = NERDJACK_NUM_SAMPLES / numChannelsSampled;
+  int totalGroups = NERDJACK_NUM_SAMPLES / numChannelsSampled;
 
 
   //Loop forever to grab data
@@ -372,18 +311,9 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
       //Increment number of packets received
       *currentcount = *currentcount + 1;
 
-      //Process the rest of the header and update the index value to be pointing after it
-      charsprocessed = NERD_HEADER_SIZE;
-      //memused = ntohl (buf.lwipmemoryused);
       adcused = ntohs (buf.adcused);
       packetsready = ntohs (buf.packetsready);
-      alignment = 0;
-      numgroups = 0;
-
-      //if(memused) {
-      //    printf("#Packet lost\n");
-      //    continue;
-      //}
+      numgroupsProcessed = 0;
 
       if (showmem)
 	{
@@ -391,18 +321,35 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 	  continue;
 	}
 
-      index = 0;
       //While there is still more data in the packet, process it
-      //use the destination structure to load the line before printing
-      while (charsread > charsprocessed)
+      while (numgroupsProcessed < totalGroups)
 	{
-	  datapoint = ntohs (buf.data[index]);
-	  if (destination[alignment].numCopies != 0)
+	  //Poison the data structure
+	  switch (convert)
 	    {
+	    case CONVERT_VOLTS:
+	      memset (voltline, 0, numChannels * sizeof (long double));
+	      break;
+	    default:
+	    case CONVERT_HEX:
+	    case CONVERT_DEC:
+	      memset (dataline, 0, numChannels * sizeof (unsigned char));
+	    }
+
+	  //Read in each group
+	  for (i = 0; i < numChannels; i++)
+	    {
+	      //Get the datapoint associated with the desired channel
+	      datapoint =
+		ntohs (buf.
+		       data[channel_list[i] +
+			    numgroupsProcessed * numChannelsSampled]);
+
+	      //Place it into the line
 	      switch (convert)
 		{
 		case CONVERT_VOLTS:
-		  if (alignment <= 5)
+		  if (channel_list[i] <= 5)
 		    {
 		      volts =
 			(long double) (datapoint / 32767.0) *
@@ -414,74 +361,48 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 			(long double) (datapoint / 32767.0) *
 			((precision & 0x02) ? 5.0 : 10.0);
 		    }
-		  for (i = 0; i < destination[alignment].numCopies; i++)
-		    {
-		      voltline[destination[alignment].destlist[i]] = volts;
-		    }
+		  voltline[i] = volts;
 		  break;
 		default:
 		case CONVERT_HEX:
 		case CONVERT_DEC:
-		  for (i = 0; i < destination[alignment].numCopies; i++)
+		  dataline[i] = (unsigned short) (datapoint - INT16_MIN);
+		  break;
+		}
+	    }
+	  //We want to dump the first line because it's usually spurious
+	  if (linesdumped != 0)
+	    {
+	      //Now print the group
+	      switch (convert)
+		{
+		case CONVERT_VOLTS:
+		  for (i = 0; i < numChannels; i++)
 		    {
-		      dataline[destination[alignment].destlist[i]] =
-			(unsigned short) (datapoint - INT16_MIN);
+		      if (printf ("%Lf ", voltline[i]) < 0)
+			goto bad;
+		    }
+		  break;
+		case CONVERT_HEX:
+		  for (i = 0; i < numChannels; i++)
+		    {
+		      if (printf ("%04hX", dataline[i]) < 0)
+			goto bad;
+		    }
+		  break;
+		default:
+		case CONVERT_DEC:
+		  for (i = 0; i < numChannels; i++)
+		    {
+		      if (printf ("%hu ", dataline[i]) < 0)
+			goto bad;
 		    }
 		  break;
 		}
+	      if (printf ("\n") < 0)
+		goto bad;
 
-	    }
-
-	  //Each point is two bytes, so increment index and total bytes read
-	  charsprocessed++;
-	  charsprocessed++;
-	  index++;
-	  alignment++;
-
-	  //Since channel data is packed, we need to know when to insert a newline
-	  if (alignment == numChannelsSampled)
-	    {
-          //We want to dump the first line because it's usually spurious
-	      if (linesdumped != 0)
-		{
-		  switch (convert)
-		    {
-		    case CONVERT_VOLTS:
-		      for (i = 0; i < numChannels; i++)
-			{
-			  if (printf ("%Lf ", voltline[i]) < 0)
-			    goto bad;
-			}
-		      break;
-		    case CONVERT_HEX:
-		      for (i = 0; i < numChannels; i++)
-			{
-			  if (printf ("%04hX", dataline[i]) < 0)
-			    goto bad;
-			}
-		      break;
-		    default:
-		    case CONVERT_DEC:
-		      for (i = 0; i < numChannels; i++)
-			{
-			  if (printf ("%hu ", dataline[i]) < 0)
-			    goto bad;
-			}
-		      break;
-		    }
-		  if (printf ("\n") < 0)
-		    goto bad;
-		}
-	      else
-		{
-		  linesdumped = linesdumped + 1;
-		  if (lines != 0)
-		    {
-		      linesleft++;
-		    }
-		}
-	      alignment = 0;
-	      numgroups++;
+	      //If we're counting lines, decrement them
 	      if (lines != 0)
 		{
 		  linesleft--;
@@ -490,15 +411,17 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 		      return 0;
 		    }
 		}
-	      //If numgroups so far is equal to the numGroups in a packet, this packet is done
-	      if (numgroups == numGroups)
-		{
-		  break;
-		}
+
 	    }
+	  else
+	    {
+	      linesdumped = linesdumped + 1;
+	    }
+
+	  //We've processed this group, so advance the counter
+	  numgroupsProcessed++;
+
 	}
-      index = 0;
-      charsprocessed = 0;
     }
 
   return 0;
@@ -576,15 +499,17 @@ nerd_generate_command (getPacket * command, int *channel_list,
 
   for (i = 0; i < channel_count; i++)
     {
-      if (channel_list[i] > highestchannel) {
-         highestchannel = channel_list[i];
-      } 
+      if (channel_list[i] > highestchannel)
+	{
+	  highestchannel = channel_list[i];
+	}
       //channelbit = channelbit | (0x1 << channel_list[i]);
     }
 
-  for( i = 0; i <= highestchannel; i++) {
-    channelbit = channelbit | (0x01 << i);
-  }
+  for (i = 0; i <= highestchannel; i++)
+    {
+      channelbit = channelbit | (0x01 << i);
+    }
 
   command->word[0] = 'G';
   command->word[1] = 'E';
@@ -606,4 +531,3 @@ nerd_close_conn (int data_fd)
   close (data_fd);
   return 0;
 }
-

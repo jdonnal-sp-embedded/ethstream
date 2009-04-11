@@ -146,7 +146,7 @@ main (int argc, char *argv[])
 		}
 	      //We do not want to overflow channel_list, so we need the check here
 	      //The rest of the sanity checking can come later after we know
-          //whether this is a 
+	      //whether this is a 
 	      //LabJack or a NerdJack
 #if UE9_CHANNELS > NERDJACK_CHANNELS
 	      if (channel_count >= UE9_CHANNELS)
@@ -227,7 +227,7 @@ main (int argc, char *argv[])
 	case 'V':
 	  printf ("etherstream " VERSION "\n");
 	  printf ("Written by Jim Paris <jim@jtan.com>\n");
-      printf ("and Zachary Clifford <zacharyc@mit.edu>\n");
+	  printf ("and Zachary Clifford <zacharyc@mit.edu>\n");
 	  printf ("This program comes with no warranty and is "
 		  "provided under the GPLv2.\n");
 	  return 0;
@@ -445,31 +445,34 @@ tryagain:
 	  goto out;
 	}
 
-  //We've tried communicating, so this is not the first call anymore
-  first_call = 0;
-
       if (nerd_send_command (address, &command, sizeof (command)) < 0)
 	{
 	  info ("Failed to send GET command\n");
 	  goto out;
 	}
-    } else {
-  //If we had a transmission in progress, send a command to resume from there
+
+    }
+  else
+    {
+      //If we had a transmission in progress, send a command to resume from there
       char cmdbuf[10];
       sprintf (cmdbuf, "SETC%05hd", currentcount);
       retval = nerd_send_command (address, cmdbuf, strlen (cmdbuf));
-      if(retval == -4) {
-          info("NerdJack was reset\n");
-          //Assume we have not started yet, reset on this side.
-          //If this routine is retried, start over
-          printf("# NerdJack was reset here\n");
-          currentcount = 0;
-          started = 0;
-          wasreset = 1;
-          goto tryagain;
-      } else if(retval < 0) {
-	      info ("Failed to send SETC command\n");
-	      goto out;
+      if (retval == -4)
+	{
+	  info ("NerdJack was reset\n");
+	  //Assume we have not started yet, reset on this side.
+	  //If this routine is retried, start over
+	  printf ("# NerdJack was reset here\n");
+	  currentcount = 0;
+	  started = 0;
+	  wasreset = 1;
+	  goto tryagain;
+	}
+      else if (retval < 0)
+	{
+	  info ("Failed to send SETC command\n");
+	  goto out;
 	}
     }
 
@@ -485,14 +488,14 @@ tryagain:
     }
 
   retval = nerd_data_stream
-      (fd_data, channel_count, channel_list, precision, convert, lines,
-       showmem, &currentcount, period, wasreset);
+    (fd_data, channel_count, channel_list, precision, convert, lines,
+     showmem, &currentcount, period, wasreset);
   wasreset = 0;
-  if(retval == -3)
-  {
+  if (retval == -3)
+    {
       retval = 0;
-  }
-  if(retval < 0) 
+    }
+  if (retval < 0)
     {
       info ("Failed to open data stream\n");
       goto out1;
@@ -504,6 +507,8 @@ tryagain:
 out1:
   nerd_close_conn (fd_data);
 out:
+  //We've tried communicating, so this is not the first call anymore
+  first_call = 0;
   return retval;
 }
 
