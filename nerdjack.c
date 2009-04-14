@@ -243,10 +243,10 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
   int numgroupsProcessed = 0;
   long double volts;
 
-  //The timeout should be the expected time plus two seconds
+  //The timeout should be the expected time plus 60 seconds
   //This permits slower speeds to work properly
   unsigned int expectedtimeout =
-    (period * NERDJACK_NUM_SAMPLES / NERDJACK_CLOCK_RATE) + 2;
+    (period * NERDJACK_NUM_SAMPLES / NERDJACK_CLOCK_RATE) + 60;
 
   //Check to see if we're trying to resume
   //Don't blow away linesleft in that case
