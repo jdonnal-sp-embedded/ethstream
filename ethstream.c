@@ -44,12 +44,13 @@ struct callbackInfo
 };
 
 struct options opt[] = {
-  {'a', "address", "string", "host/address of UE9 (192.168.1.209)"},
+  {'a', "address", "string", "host/address of device (192.168.1.209)"},
   {'n', "numchannels", "n", "sample the first N ADC channels (2)"},
-  {'N', "nerdjack", NULL, "Use NerdJack device instead"},
+  {'N', "nerdjack", NULL, "Force NerdJack device"},
+  {'L', "labjack",NULL,"Force LabJack device"},
   {'d', "detect", NULL, "Detect NerdJack IP address"},
-  {'p', "precision", "0-3",
-   "Set precision on NerdJack (0 - max range, 1 - max precision)"},
+  {'R', "range", "a,b",
+   "Set range on NerdJack for channels 0-5,6-11 to either 5 or 10 (10,10)"},
   {'C', "channels", "a,b,c", "sample channels a, b, and c"},
   {'r', "rate", "hz", "sample each channel at this rate (8000.0)"},
   {'o', "oneshot", NULL, "don't retry in case of errors"},
@@ -109,8 +110,11 @@ main (int argc, char *argv[])
 #endif
   int channel_count = 0;
   int nerdjack = 0;
+  int labjack = 0;
   int detect = 0;
   int precision = 0;
+  int addressSpecified = 0;
+  int donerdjack = 0;
   unsigned long period = NERDJACK_CLOCK_RATE / desired_rate;
 
   /* Parse arguments */
@@ -122,6 +126,7 @@ main (int argc, char *argv[])
 	case 'a':
 	  free (address);
 	  address = strdup (optarg);
+      addressSpecified = 1;
 	  break;
 	case 'n':
 	  channel_count = 0;
@@ -179,21 +184,41 @@ main (int argc, char *argv[])
 	      goto printhelp;
 	    }
 	  break;
-	case 'p':
-	  tmp = strtol (optarg, &endp, 0);
-	  if (tmp <= 3 && tmp >= 0)
-	    {
-	      precision = tmp;
-	    }
-	  else
-	    {
-	      info ("Bad argument to p: %s\n", optarg);
-	      goto printhelp;
-	    }
+	case 'R':
+	      tmp = strtol (optarg, &endp, 0);
+	      if (*endp != ',')
+		{
+		  info ("bad range number: %s\n", optarg);
+		  goto printhelp;
+		}
+          if(tmp != 5 && tmp != 10) {
+              info("valid choices for range are 5 or 10\n");
+              goto printhelp;
+          }
+          if(tmp == 5) precision = precision + 1;
+
+	      optarg = endp + 1;
+          if (*endp == '\0') {
+              info("Range needs two numbers, one for channels 0-5 and another for 6-11\n");
+              goto printhelp;
+          }
+          tmp = strtol (optarg, &endp, 0);
+          if (*endp != '\0') {
+              info("Range needs only two numbers, one for channels 0-5 and another for 6-11\n");
+              goto printhelp;
+          }
+	  if(tmp != 5 && tmp != 10) {
+              info("valid choices for range are 5 or 10\n");
+              goto printhelp;
+          }
+        if(tmp == 5) precision = precision + 2;
 	  break;
 	case 'N':
 	  nerdjack++;
 	  break;
+    case 'L':
+      labjack++;
+      break;
 	case 'd':
 	  detect++;
 	  break;
@@ -244,9 +269,40 @@ main (int argc, char *argv[])
 	}
     }
 
-doneparse:
+    if (detect && labjack) {
+      info("The LabJack does not support autodetection\n");
+      goto printhelp;
+      }
+  
+  if (detect && !nerdjack) {
+      info("Only the NerdJack supports autodetection - assuming -N option\n");
+      nerdjack = 1;
+      }
+      
+  if (detect && addressSpecified) {
+      info("Autodetection and specifying address are mutually exclusive\n");
+      goto printhelp;
+  }
+  
+    if (nerdjack && labjack) {
+      info("Nerdjack and Labjack options are mutually exclusive\n");
+      goto printhelp;
+  }
+      
+      donerdjack = nerdjack;
+      
+  //First if no options were supplied try the Nerdjack
+  //The second time through, donerdjack will be true and this will not fire
+  if (!nerdjack && !labjack) {
+      info("No device specified...Defaulting to Nerdjack\n");
+      donerdjack = 1;
+  }
 
-  if (nerdjack)
+doneparse:
+  
+
+
+  if (donerdjack)
     {
       if (channel_count > NERDJACK_CHANNELS)
 	{
@@ -310,7 +366,7 @@ doneparse:
     }
 
   /* Figure out actual rate. */
-  if (nerdjack)
+  if (donerdjack)
     {
       if (nerdjack_choose_scan (desired_rate, &actual_rate, &period) < 0)
 	{
@@ -351,6 +407,7 @@ doneparse:
       if (nerdjack_detect (address) < 0)
 	{
 	  info ("Error with autodetection\n");
+      goto printhelp;
 	}
       else
 	{
@@ -362,7 +419,7 @@ doneparse:
   for (;;)
     {
       int ret;
-      if (nerdjack)
+      if (donerdjack)
 	{
 	  ret =
 	    nerdDoStream (address, channel_list, channel_count, precision,
@@ -382,12 +439,29 @@ doneparse:
       if (ret == 0)
 	break;
 
-      if (ret == -ENOTCONN && !nerdjack)
+    //Neither options specified at command line and first time through.
+    //Try LabJack
+      if (ret == -ENOTCONN && donerdjack && !labjack && !nerdjack)
 	{
-	  info ("Could not connect LabJack...Trying NerdJack\n");
-	  nerdjack = 1;
+	  info ("Could not connect NerdJack...Trying LabJack\n");
+	  donerdjack = 0;
 	  goto doneparse;
 	}
+    
+    //Neither option supplied, no address, and second time through.
+    //Try autodetection
+    if (ret == -ENOTCONN && !donerdjack && !labjack && !nerdjack && !addressSpecified) {
+      info ("Could not connect LabJack...Trying to autodetect Nerdjack\n");
+      detect = 1;
+      donerdjack = 1;
+      goto doneparse;
+    }
+    
+    if (ret == -ENOTCONN && nerdjack && !detect && !addressSpecified) {
+      info ("Could not reach NerdJack...Trying to autodetect\n");
+      detect = 1;
+      goto doneparse;
+    }
 
       if (ret == -ENOTCONN && !forceretry)
 	{
@@ -439,9 +513,12 @@ tryagain:
 
       if (nerd_send_command (address, "STOP", 4) < 0)
 	{
-	  if (first_call)
+	  if (first_call) {
 	    retval = -ENOTCONN;
+        if(verb_count) info("Failed to send STOP command\n");
+        } else {
 	  info ("Failed to send STOP command\n");
+      }
 	  goto out;
 	}
 

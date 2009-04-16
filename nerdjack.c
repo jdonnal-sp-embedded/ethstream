@@ -231,7 +231,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
     }
 
 
-  long double voltline[numChannels];
+  double voltline[numChannels];
 
   unsigned short dataline[numChannels];
 
@@ -241,7 +241,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
   int charsread = 0;
 
   int numgroupsProcessed = 0;
-  long double volts;
+  double volts;
 
   //The timeout should be the expected time plus 60 seconds
   //This permits slower speeds to work properly
@@ -328,7 +328,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 	  switch (convert)
 	    {
 	    case CONVERT_VOLTS:
-	      memset (voltline, 0, numChannels * sizeof (long double));
+	      memset (voltline, 0, numChannels * sizeof (double));
 	      break;
 	    default:
 	    case CONVERT_HEX:
@@ -352,13 +352,13 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 		  if (channel_list[i] <= 5)
 		    {
 		      volts =
-			(long double) (datapoint / 32767.0) *
+			(double) (datapoint / 32767.0) *
 			((precision & 0x01) ? 5.0 : 10.0);
 		    }
 		  else
 		    {
 		      volts =
-			(long double) (datapoint / 32767.0) *
+			(double) (datapoint / 32767.0) *
 			((precision & 0x02) ? 5.0 : 10.0);
 		    }
 		  voltline[i] = volts;
@@ -379,7 +379,7 @@ nerd_data_stream (int data_fd, int numChannels, int *channel_list,
 		case CONVERT_VOLTS:
 		  for (i = 0; i < numChannels; i++)
 		    {
-		      if (printf ("%Lf ", voltline[i]) < 0)
+		      if (printf ("%lf ", voltline[i]) < 0)
 			goto bad;
 		    }
 		  break;
@@ -477,7 +477,7 @@ nerd_open (const char *address, int port)
       (i32SocketFD, (struct sockaddr *) &stSockAddr, sizeof (stSockAddr),
        &(struct timeval)
        {
-       .tv_sec = NERDJACK_TIMEOUT}) < 0)
+       .tv_sec = 3}) < 0)
     {
       verb ("connection to %s:%d failed: %s\n",
 	    inet_ntoa (stSockAddr.sin_addr), port, compat_strerror (errno));
