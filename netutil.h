@@ -11,6 +11,7 @@
 #  define socklen_t int
 #  define in_addr_t uint32_t
 #  define in_port_t uint16_t
+#  include <windows.h>
 #  include <iphlpapi.h>
 #  define USE_IPHLPAPI 1
 #else

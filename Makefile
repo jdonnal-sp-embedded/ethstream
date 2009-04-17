@@ -21,7 +21,7 @@ BINPATH = ${PREFIX}/bin
 
 WINCC = i386-mingw32-gcc
 WINCFLAGS += $(CFLAGS)
-WINLDFLAGS += $(LDFLAGS) -lws2_32 -s
+WINLDFLAGS += $(LDFLAGS) -lws2_32 -liphlpapi -s
 
 # Targets
 
