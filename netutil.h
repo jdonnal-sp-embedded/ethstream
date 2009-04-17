@@ -11,11 +11,18 @@
 #  define socklen_t int
 #  define in_addr_t uint32_t
 #  define in_port_t uint16_t
+#  include <iphlpapi.h>
+#  define USE_IPHLPAPI 1
 #else
 #  include <sys/socket.h>
 #  include <netinet/in.h>
 #  include <arpa/inet.h>
 #  include <netdb.h>
+#  include <net/if.h>
+#  include <sys/ioctl.h>
+#ifndef _SIZEOF_ADDR_IFREQ
+#define _SIZEOF_ADDR_IFREQ(x) sizeof(x)
+#endif
 #endif
 
 /* Initialize networking */
