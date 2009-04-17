@@ -15,6 +15,21 @@
 #include <string.h>
 #include <sys/types.h>
 #include <math.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/timeb.h>
+#include <sys/wait.h>
+#include <sys/signal.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#include <net/if.h>
+#include <sys/ioctl.h>
+#ifndef _SIZEOF_ADDR_IFREQ
+#define _SIZEOF_ADDR_IFREQ(x) sizeof(x)
+#endif
 
 #include "netutil.h"
 #include "compat.h"
@@ -28,6 +43,7 @@
 #define NERDJACK_TIMEOUT 5	/* Timeout for connect/send/recv, in seconds */
 
 #define NERD_HEADER_SIZE 8
+#define MAX_SOCKETS 32
 
 typedef struct __attribute__ ((__packed__))
 {
@@ -38,6 +54,17 @@ typedef struct __attribute__ ((__packed__))
   unsigned short packetsready;
   signed short data[NERDJACK_NUM_SAMPLES];
 } dataPacket;
+
+struct discovered_socket {
+	int sock;
+	uint32_t local_ip;
+	uint32_t subnet_mask;
+};
+
+struct discover_t {
+	struct discovered_socket socks[MAX_SOCKETS];
+	unsigned int sock_count;
+};
 
 /* Choose the best ScanConfig and ScanInterval parameters for the
    desired scanrate.  Returns -1 if no valid config found */
@@ -65,6 +92,103 @@ nerdjack_choose_scan (double desired_rate, double *actual_rate,
   return 0;
 }
 
+static int discovered_sock_create(struct discover_t *ds, uint32_t local_ip, uint32_t subnet_mask)
+{
+	if (ds->sock_count >= MAX_SOCKETS) {
+		return 0;
+	}
+
+	/* Create socket. */
+	int sock = (int)socket(AF_INET, SOCK_DGRAM, 0);
+	if (sock == -1) {
+		return 0;
+	}
+
+	/* Set timeouts. */
+	//setsocktimeout(sock, SOL_SOCKET, SO_SNDTIMEO, 1000);
+	//setsocktimeout(sock, SOL_SOCKET, SO_RCVTIMEO, 1000);
+
+	/* Allow broadcast. */
+	int sock_opt = 1;
+	setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (char *)&sock_opt, sizeof(sock_opt));
+
+    /* Set nonblocking */
+    if (soblock (sock, 0) < 0)
+    {
+      verb ("can't set nonblocking\n");
+      return 0;
+    }
+
+	/* Bind socket. */
+	struct sockaddr_in sock_addr;
+	memset(&sock_addr, 0, sizeof(sock_addr));
+	sock_addr.sin_family = AF_INET;
+	sock_addr.sin_addr.s_addr = htonl(local_ip);
+	sock_addr.sin_port = htons(0);
+	if (bind(sock, (struct sockaddr *)&sock_addr, sizeof(sock_addr)) != 0) {
+		close(sock);
+		return 0;
+	}
+
+	/* Write sock entry. */
+	struct discovered_socket *dss = &ds->socks[ds->sock_count++];
+	dss->sock = sock;
+	dss->local_ip = local_ip;
+	dss->subnet_mask = subnet_mask;
+
+	return 1;
+}
+
+static void enumerate_interfaces(struct discover_t *ds) {
+	int fd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (fd == -1) {
+		return;
+	}
+
+	struct ifconf ifc;
+	uint8_t buf[8192];
+    //char stringbuffer[INET_ADDRSTRLEN];
+	ifc.ifc_len = sizeof(buf);
+	ifc.ifc_buf = (char *)buf;
+
+	memset(buf, 0, sizeof(buf));
+
+	if (ioctl(fd, SIOCGIFCONF, &ifc) != 0) {
+		close(fd);
+		return;
+	}
+
+	uint8_t *ptr = (uint8_t *)ifc.ifc_req;
+	uint8_t	*end = (uint8_t *)&ifc.ifc_buf[ifc.ifc_len];
+
+	while (ptr <= end) {
+		struct ifreq *ifr = (struct ifreq *)ptr;
+		ptr += _SIZEOF_ADDR_IFREQ(*ifr);
+
+		if (ioctl(fd, SIOCGIFADDR, ifr) != 0) {
+			continue;
+		}
+		struct sockaddr_in *addr_in = (struct sockaddr_in *)&(ifr->ifr_addr);
+		uint32_t local_ip = ntohl(addr_in->sin_addr.s_addr);
+		if (local_ip == 0) {
+			continue;
+		}
+
+        //inet_ntop(AF_INET, &addr_in->sin_addr,
+        //                              stringbuffer, INET_ADDRSTRLEN);
+        //printf("%s\n",stringbuffer);
+
+		if (ioctl(fd, SIOCGIFNETMASK, ifr) != 0) {
+			continue;
+		}
+
+		struct sockaddr_in *mask_in = (struct sockaddr_in *)&(ifr->ifr_addr);
+		uint32_t mask = ntohl(mask_in->sin_addr.s_addr);
+
+		discovered_sock_create(ds, local_ip, mask);
+	}
+}
+
 /* Perform autodetection.  Returns 0 on success, -1 on error
  * Sets ipAddress to the detected address
  */
@@ -73,25 +197,48 @@ nerdjack_detect (char *ipAddress)
 {
   int32_t sock, receivesock;
   struct sockaddr_in sa, receiveaddr, sFromAddr;
-  int bytes_sent, buffer_length;
+  int buffer_length;
   char buffer[200];
   char incomingData[10];
   unsigned int lFromLen;
+  
+  //char stringbuffer[INET_ADDRSTRLEN];
 
   sprintf (buffer, "TEST");
   buffer_length = strlen (buffer) + 1;
 
   net_init ();
+  
+  	struct discover_t *ds = (struct discover_t *)calloc(1, sizeof(struct discover_t));
+	if (!ds) {
+		return -1;
+	}
 
-  sock = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	/* Create a routable socket. */
+	if (!discovered_sock_create(ds, 0, 0)) {
+		free(ds);
+		return -1;
+	}
+
+	/* Detect & create local sockets. */
+	enumerate_interfaces(ds);
+    
+    //for(i = 0; i < ds->sock_count; i++) {
+    //inet_ntop(AF_INET, (struct sockaddr_in *) &ds->socks[i].local_ip,
+    //                                  stringbuffer, INET_ADDRSTRLEN);
+    //printf("%s\n",stringbuffer);
+    //}
+    //return -1;
+
+  //sock = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP);
   receivesock = socket (PF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
   /* Set nonblocking */
-  if (soblock (sock, 0) < 0)
-    {
-      verb ("can't set nonblocking\n");
-      return -1;
-    }
+  //if (soblock (sock, 0) < 0)
+  //  {
+  //    verb ("can't set nonblocking\n");
+  //    return -1;
+  //  }
 
   /* Set nonblocking */
   if (soblock (receivesock, 0) < 0)
@@ -101,10 +248,10 @@ nerdjack_detect (char *ipAddress)
     }
 
 
-  int opt = 1;
-  setsockopt (sock, SOL_SOCKET, SO_BROADCAST, (void *) &opt, sizeof (int));
+  //int opt = 1;
+  //setsockopt (sock, SOL_SOCKET, SO_BROADCAST, (void *) &opt, sizeof (int));
 
-  if ((-1 == sock) || (-1 == receivesock))	/* if socket failed to initialize, exit */
+  if (-1 == receivesock)	/* if socket failed to initialize, exit */
     {
       verb ("Error Creating Socket\n");
       return -1;
@@ -120,19 +267,45 @@ nerdjack_detect (char *ipAddress)
 
   //Receive from any IP address, Will send to broadcast
   receiveaddr.sin_addr.s_addr = INADDR_ANY;
-  sa.sin_addr.s_addr = INADDR_BROADCAST;
+  //sa.sin_addr.s_addr = INADDR_BROADCAST;
 
   bind (receivesock, (struct sockaddr *) &receiveaddr,
 	sizeof (struct sockaddr_in));
 
-  bytes_sent =
-    sendto (sock, buffer, buffer_length, 0, (struct sockaddr *) &sa,
-	    sizeof (struct sockaddr_in));
-  if (bytes_sent < 0)
-    {
-      info ("Error sending packet: %s\n", strerror (errno));
-      return -1;
-    }
+  //bytes_sent =
+  //  sendto (sock, buffer, buffer_length, 0, (struct sockaddr *) &sa,
+	//    sizeof (struct sockaddr_in));
+  //if (bytes_sent < 0)
+  //  {
+  //    info ("Error sending packet: %s\n", strerror (errno));
+  //    return -1;
+  //  }
+
+	//int result = 0;
+
+	/*
+	 * Send subnet broadcast using each local ip socket.
+	 * This will work with multiple separate 169.254.x.x interfaces.
+	 */
+	unsigned int i;
+	for (i = 0; i < ds->sock_count; i++) {
+		struct discovered_socket *dss = &ds->socks[i];
+		uint32_t target_ip = dss->local_ip | ~dss->subnet_mask;
+        sa.sin_addr.s_addr = htonl(target_ip);
+        sendto (dss->sock, buffer, buffer_length, 0, (struct sockaddr *) &sa,
+	      sizeof (struct sockaddr_in));
+		//result |= hdhomerun_discover_send_internal(ds, dss, target_ip, device_type, device_id);
+	}
+
+	/*
+	 * If no local ip sockets then fall back to sending a global broadcast letting the OS choose the interface.
+	 */
+	//if (!result) {
+	//	struct hdhomerun_discover_sock_t *dss = &ds->socks[0];
+	//	result = hdhomerun_discover_send_internal(ds, dss, 0xFFFFFFFF, device_type, device_id);
+	//}
+
+	//return result;
 
   lFromLen = sizeof (sFromAddr);
 
