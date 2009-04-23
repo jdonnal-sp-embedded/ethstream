@@ -31,6 +31,8 @@
 #include "compat.h"
 #include "ethstream.h"
 
+#include "example.h"
+
 #define DEFAULT_HOST "192.168.1.209"
 #define UE9_COMMAND_PORT 52360
 #define UE9_DATA_PORT 52361
@@ -62,6 +64,7 @@ struct options opt[] = {
   {'h', "help", NULL, "this help"},
   {'v', "verbose", NULL, "be verbose"},
   {'V', "version", NULL, "show version number and exit"},
+  {'X', "examples",NULL, "show ethstream examples and exit"},
   {0, NULL, NULL, NULL}
 };
 
@@ -249,6 +252,10 @@ main (int argc, char *argv[])
 	case 'v':
 	  verb_count++;
 	  break;
+    case 'X':
+      printf("%s",examplestring);
+      return 0;
+      break;
 	case 'V':
 	  printf ("etherstream " VERSION "\n");
 	  printf ("Written by Jim Paris <jim@jtan.com>\n");
