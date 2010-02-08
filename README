@@ -2,5 +2,10 @@ Labjack/Nerdjack Tools
 by Jim Paris <jim@jtan.com>
 with modifications by Zach Clifford <zacharyc@mit.edu>
 
-These tools are for interacting with the LabJack UE9 or the NerdJack over the Ethernet interface.  More information about the UE9 device:
+These tools are for interacting with the LabJack UE9 or the NerdJack
+over the Ethernet interface.  More information about the UE9 device:
   http://www.labjack.com/labjack_ue9.php
+
+The NerdJack device is a custom board made in LEES by Zach Clifford.
+
+Use ethstream -h or ethstream -X for usage instructions and examples.

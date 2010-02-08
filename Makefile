@@ -32,11 +32,11 @@ default: lin
 all: lin win
 
 .PHONY: lin
-lin: ljtest ethstream ljconfig \
-	ethstream.1 ljconfig.1
+lin: ethstream \
+	ethstream.1 
 
 .PHONY: win
-win: ljtest.exe ethstream.exe ljconfig.exe
+win: ethstream.exe
 
 
 version.h: VERSION
@@ -46,17 +46,11 @@ version.h: VERSION
 # Object files for each executable
 
 obj-common = opt.o ue9.o ue9error.o netutil.o debug.o nerdjack.o
-obj-ljconfig = ljconfig.o $(obj-common)
 obj-ethstream = ethstream.o $(obj-common)
-obj-ljtest = ljtest.o $(obj-common)
 
-ljconfig: $(obj-ljconfig)
 ethstream: $(obj-ethstream)
-ljtest: $(obj-ljtest)
 
-ljconfig.exe: $(obj-ljconfig:.o=.obj) compat-win32.obj
 ethstream.exe: $(obj-ethstream:.o=.obj) compat-win32.obj
-ljtest.exe: $(obj-ljtest:.o=.obj) compat-win32.obj
 
 # Manpages
 
@@ -92,7 +86,7 @@ dist: version.h
 
 .PHONY: clean distclean
 clean distclean:
-	rm -f *.o *.obj *.exe ethstream ljtest ljconfig core *.d *.1 *.txt
+	rm -f *.o *.obj *.exe ethstream core *.d *.1 *.txt
 
 # Dependency tracking:
 

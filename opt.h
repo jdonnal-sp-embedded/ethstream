@@ -11,19 +11,18 @@
 
 #include <stdlib.h>
 
-struct options
-{
-  char shortopt;
-  char *longopt;
-  char *arg;
-  char *help;
+struct options {
+	char shortopt;
+	char *longopt;
+	char *arg;
+	char *help;
 };
 
-void opt_init (int *optind);
+void opt_init(int *optind);
 
-char opt_parse (int argc, char **argv, int *optind, char **optarg,
-		struct options *opt);
+char opt_parse(int argc, char **argv, int *optind, char **optarg,
+	       struct options *opt);
 
-void opt_help (struct options *opt, FILE * out);
+void opt_help(struct options *opt, FILE * out);
 
 #endif

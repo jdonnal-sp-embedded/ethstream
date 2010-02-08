@@ -14,8 +14,8 @@ extern int verb_count;
 
 #include <stdio.h>
 
-int func_fprintf (const char *func, FILE * stream, const char *format,
-		  ...) __attribute__ ((format (printf, 3, 4)));
+int func_fprintf(const char *func, FILE * stream, const char *format,
+		 ...) __attribute__ ((format(printf, 3, 4)));
 
 #define debug(x...) ({ \
 	if(verb_count >= 2) \

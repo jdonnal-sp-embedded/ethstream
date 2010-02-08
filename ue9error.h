@@ -44,6 +44,6 @@
 
 extern const char *ue9_error_text[];
 
-const char *ue9_error (int errorcode);
+const char *ue9_error(int errorcode);
 
 #endif
