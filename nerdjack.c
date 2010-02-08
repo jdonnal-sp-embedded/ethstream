@@ -25,8 +25,6 @@
 #include "netutil.h"
 #include "ethstream.h"
 
-#define NERDJACK_TIMEOUT 5	/* Timeout for connect/send/recv, in seconds */
-
 #define NERD_HEADER_SIZE 8
 #define MAX_SOCKETS 32
 
@@ -312,7 +310,7 @@ int nerdjack_detect(char *ipAddress)
 	    recvfrom_timeout(receivesock, incomingData, sizeof(incomingData), 0,
 			     (struct sockaddr *)&sFromAddr, &lFromLen,
 			     &(struct timeval) {
-			     .tv_sec = NERDJACK_TIMEOUT})) {
+			     .tv_sec = TIMEOUT})) {
 		close(receivesock);
 		return -1;
 	}
@@ -341,14 +339,14 @@ int nerd_get_version(const char *address)
 
 	/* Send request */
 	ret = send_all_timeout(fd_command, "VERS", 4, 0, &(struct timeval) {
-			       .tv_sec = NERDJACK_TIMEOUT});
+			       .tv_sec = TIMEOUT});
 	if (ret < 0) {
 		verb("short send %d\n", (int)ret);
 		return -1;
 	}
 
 	ret = recv_all_timeout(fd_command, buf, 200, 0, &(struct timeval) {
-			       .tv_sec = NERDJACK_TIMEOUT});
+			       .tv_sec = TIMEOUT});
 
 	nerd_close_conn(fd_command);
 
@@ -380,14 +378,14 @@ int nerd_send_command(const char *address, void *command, int length)
 
 	/* Send request */
 	ret = send_all_timeout(fd_command, command, length, 0, &(struct timeval) {
-			       .tv_sec = NERDJACK_TIMEOUT});
+			       .tv_sec = TIMEOUT});
 	if (ret < 0 || ret != length) {
 		verb("short send %d\n", (int)ret);
 		return -1;
 	}
 
 	ret = recv_all_timeout(fd_command, buf, 3, 0, &(struct timeval) {
-			       .tv_sec = NERDJACK_TIMEOUT});
+			       .tv_sec = TIMEOUT});
 
 	nerd_close_conn(fd_command);
 

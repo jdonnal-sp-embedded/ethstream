@@ -24,8 +24,7 @@
 #include "ue9error.h"
 #include "util.h"
 #include "netutil.h"
-
-#define UE9_TIMEOUT 5		/* Timeout for connect/send/recv, in seconds */
+#include "ethstream.h"
 
 /* Fill checksums in data buffers, with "normal" checksum format */
 void ue9_checksum_normal(uint8_t * buffer, size_t len)
@@ -183,7 +182,7 @@ int ue9_command(int fd, uint8_t * out, uint8_t * in, int inlen)
 
 	/* Send request */
 	ret = send_all_timeout(fd, out, outlen, 0, &(struct timeval) {
-			       .tv_sec = UE9_TIMEOUT});
+			       .tv_sec = TIMEOUT});
 	if (ret < 0 || ret != outlen) {
 		verb("short send %d\n", (int)ret);
 		return -1;
@@ -197,7 +196,7 @@ int ue9_command(int fd, uint8_t * out, uint8_t * in, int inlen)
 
 	/* Receive result */
 	ret = recv_all_timeout(fd, in, inlen, 0, &(struct timeval) {
-			       .tv_sec = UE9_TIMEOUT});
+			       .tv_sec = TIMEOUT});
 	if (ret < 0 || ret != inlen) {
 		verb("short recv %d\n", (int)ret);
 		return -1;
@@ -399,11 +398,13 @@ int ue9_open(const char *host, int port)
 	/* Connect */
 	if (connect_timeout(fd, (struct sockaddr *)&address, sizeof(address),
 			    &(struct timeval) {
-			    .tv_sec = UE9_TIMEOUT}) < 0) {
+			    .tv_sec = TIMEOUT}) < 0) {
 		verb("connection to %s:%d failed: %s\n",
 		     inet_ntoa(address.sin_addr), port, compat_strerror(errno));
 		return -1;
 	}
+	
+	debug("Connected to port %d\n", htons(port));
 
 	return fd;
 }
@@ -650,7 +651,7 @@ ue9_stream_data(int fd, int channels, ue9_stream_cb_t callback, void *context)
 	for (;;) {
 		/* Receive data */
 		ret = recv_all_timeout(fd, buf, 46, 0, &(struct timeval) {
-				       .tv_sec = UE9_TIMEOUT});
+				       .tv_sec = TIMEOUT});
 
 		/* Verify packet format */
 		if (ret != 46) {
