@@ -404,7 +404,7 @@ int ue9_open(const char *host, int port)
 		return -1;
 	}
 	
-	debug("Connected to port %d\n", htons(port));
+	debug("Connected to port %d\n", port);
 
 	return fd;
 }
