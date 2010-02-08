@@ -689,20 +689,21 @@ int data_callback(int channels, uint16_t * data, void *context)
 
 	columns_left = channels;
 	for (i = 0; i < channels; i++) {
-		switch (ci->convert) {
-		case CONVERT_VOLTS:
-			if (printf
-			    ("%lf",
-			     ue9_binary_to_analog(&ci->calib, UE9_BIPOLAR_GAIN1,
-						  12, data[i])) < 0)
+		if (ci->convert == CONVERT_VOLTS &&
+		    i <= UE9_MAX_ANALOG_CHANNEL) {
+			/* CONVERT_VOLTS */
+			if (printf("%lf", ue9_binary_to_analog(
+					   &ci->calib, UE9_BIPOLAR_GAIN1,
+					   12, data[i])) < 0)
 				goto bad;
 			break;
-		case CONVERT_HEX:
+		} else if (ci->convert == CONVERT_HEX) {
+			/* CONVERT_HEX */
 			if (printf("%04X", data[i]) < 0)
 				goto bad;
 			break;
-		default:
-		case CONVERT_DEC:
+		} else {
+			/* CONVERT_DEC */
 			if (printf("%d", data[i]) < 0)
 				goto bad;
 			break;

@@ -76,6 +76,7 @@ struct ue9ControlConfig {
 
 #define UE9_MAX_CHANNEL_COUNT 128
 #define UE9_MAX_CHANNEL 255
+#define UE9_MAX_ANALOG_CHANNEL 13
 #define UE9_TIMERS 6
 
 /* Fill checksums in data buffers */
