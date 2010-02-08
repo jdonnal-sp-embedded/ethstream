@@ -243,7 +243,7 @@ int nerdjack_detect(char *ipAddress)
 	int buffer_length;
 	char buffer[200];
 	char incomingData[10];
-	unsigned int lFromLen;
+	socklen_t lFromLen;
 
 	sprintf(buffer, "TEST");
 	buffer_length = strlen(buffer) + 1;

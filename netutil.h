@@ -8,7 +8,7 @@
 #ifdef __WIN32__
 #  include <winsock2.h>
 #  include <ws2tcpip.h>
-#  define socklen_t unsigned int
+#  define socklen_t int
 #  define in_addr_t uint32_t
 #  define in_port_t uint16_t
 #  include <windows.h>
