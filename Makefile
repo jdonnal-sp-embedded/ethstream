@@ -19,7 +19,8 @@ PREFIX = /usr/local
 MANPATH = ${PREFIX}/man/man1
 BINPATH = ${PREFIX}/bin
 
-WINCC = i386-mingw32-gcc
+#WINCC = i386-mingw32-gcc
+WINCC = i586-mingw32msvc-gcc
 WINCFLAGS += $(CFLAGS)
 WINLDFLAGS += $(LDFLAGS) -lws2_32 -liphlpapi -s
 
@@ -32,8 +33,7 @@ default: lin
 all: lin win
 
 .PHONY: lin
-lin: ethstream \
-	ethstream.1 
+lin: ethstream ethstream.1 ethstream.txt
 
 .PHONY: win
 win: ethstream.exe
@@ -86,16 +86,19 @@ dist: version.h
 
 .PHONY: clean distclean
 clean distclean:
-	rm -f *.o *.obj *.exe ethstream core *.d *.1 *.txt
+	rm -f *.o *.obj *.exe ethstream core *.d *.dobj *.1 *.txt
 
 # Dependency tracking:
 
 allsources = $(wildcard *.c)
+
 -include $(allsources:.c=.d)
 %.o : %.c
-	$(COMPILE.c) -MP -MMD -MT '$*.obj' -o $@ $<
+	$(COMPILE.c) -MP -MMD -MT '$*.o' -MF '$*.d' -o $@ $<
+
+-include $(allsources:.c=.dobj)
 %.obj : %.c
-	$(WINCC) $(WINCFLAGS) -MP -MMD -MT '$*.o' -c -o $@ $<
+	$(WINCC) $(WINCFLAGS) -MP -MMD -MT '$*.obj' -MF '$*.dobj' -c -o $@ $<
 
 # Win32 executable
 

@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
 		case 'V':
 			printf("etherstream " VERSION "\n");
 			printf("Written by Jim Paris <jim@jtan.com>\n");
-			printf("and Zachary Clifford <zacharyc@mit.edu>\n");
+			printf("and Zachary Clifford <zacharyc@mit.edu>.\n");
 			printf("This program comes with no warranty and is "
 			       "provided under the GPLv2.\n");
 			return 0;
