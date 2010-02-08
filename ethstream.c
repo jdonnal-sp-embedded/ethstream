@@ -26,7 +26,7 @@
 #include "compat.h"
 #include "ethstream.h"
 
-#include "example.h"
+#include "example.inc"
 
 #define DEFAULT_HOST "192.168.1.209"
 #define UE9_COMMAND_PORT 52360
