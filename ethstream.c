@@ -696,17 +696,14 @@ int data_callback(int channels, uint16_t * data, void *context)
 					   &ci->calib, UE9_BIPOLAR_GAIN1,
 					   12, data[i])) < 0)
 				goto bad;
-			break;
 		} else if (ci->convert == CONVERT_HEX) {
 			/* CONVERT_HEX */
 			if (printf("%04X", data[i]) < 0)
 				goto bad;
-			break;
 		} else {
 			/* CONVERT_DEC */
 			if (printf("%d", data[i]) < 0)
 				goto bad;
-			break;
 		}
 		columns_left--;
 		if (i < (channels - 1)) {
