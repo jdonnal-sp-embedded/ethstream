@@ -16,7 +16,7 @@
 CFLAGS += -Wall -g #-pg
 LDFLAGS += -lm #-pg
 PREFIX = /usr/local
-MANPATH = ${PREFIX}/man/man1
+MANPATH = ${PREFIX}/man/man1/
 BINPATH = ${PREFIX}/bin
 
 #WINCC = i386-mingw32-gcc
@@ -66,6 +66,7 @@ ethstream.exe: $(obj-ethstream:.o=.obj) compat-win32.obj
 
 .PHONY: install
 install: ethstream.1 ethstream
+	mkdir -p ${BINPATH} ${MANPATH}
 	install -m 0755 ethstream ${BINPATH}
 	install -m 0644 ethstream.1 ${MANPATH}
 
