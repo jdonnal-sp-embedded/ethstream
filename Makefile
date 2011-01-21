@@ -49,6 +49,7 @@ obj-common = opt.o ue9.o ue9error.o netutil.o debug.o nerdjack.o
 obj-ethstream = ethstream.o $(obj-common)
 
 ethstream: $(obj-ethstream)
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 ethstream.exe: $(obj-ethstream:.o=.obj) compat-win32.obj
 
