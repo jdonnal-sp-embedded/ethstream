@@ -423,6 +423,9 @@ int main(int argc, char *argv[])
 	signal(SIGINT, handle_sig);
 	signal(SIGTERM, handle_sig);
 
+	/* Ignore SIGPIPE so I/O errors to the network device won't kill the process */
+	signal(SIGPIPE, SIG_IGN);
+
 	if (detect) {
 		info("Autodetecting NerdJack address\n");
 		free(address);
