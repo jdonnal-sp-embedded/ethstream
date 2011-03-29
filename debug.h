@@ -16,6 +16,8 @@ extern int verb_count;
 
 int func_fprintf(const char *func, FILE * stream, const char *format,
 		 ...) __attribute__ ((format(printf, 3, 4)));
+int my_fprintf(FILE * stream, const char *format,
+	       ...) __attribute__ ((format(printf, 2, 3)));
 
 #define debug(x...) ({ \
 	if(verb_count >= 2) \
@@ -28,6 +30,11 @@ int func_fprintf(const char *func, FILE * stream, const char *format,
 })
 
 #define info(x...) ({ \
+	if(verb_count >= 0) \
+		my_fprintf(stderr,x); \
+})
+
+#define info_no_timestamp(x...) ({ \
 	if(verb_count >= 0) \
 		fprintf(stderr,x); \
 })

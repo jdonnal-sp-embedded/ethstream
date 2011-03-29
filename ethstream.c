@@ -394,8 +394,8 @@ int main(int argc, char *argv[])
 	if (verb_count) {
 		info("Scanning channels:");
 		for (i = 0; i < channel_count; i++)
-			info(" AIN%d", channel_list[i]);
-		info("\n");
+			info_no_timestamp(" AIN%d", channel_list[i]);
+		info_no_timestamp("\n");
 	}
 
 	/* Figure out actual rate. */
