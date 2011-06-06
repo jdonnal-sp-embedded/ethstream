@@ -54,6 +54,7 @@ struct options opt[] = {
 	{'d', "detect", NULL, "Detect NerdJack IP address"},
 	{'R', "range", "a,b",
 	 "Set range on NerdJack for channels 0-5,6-11 to either 5 or 10 (10,10)"},
+	{'g', "gian", "a,b,c", "Set Labjack AIN channel gains: 0,1,2,4,8 in -C channel order"},
 	{'o', "oneshot", NULL, "don't retry in case of errors"},
 	{'f', "forceretry", NULL, "retry no matter what happens"},
 	{'c', "convert", NULL, "convert output to volts"},
@@ -71,11 +72,13 @@ struct options opt[] = {
 int doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	     int *channel_list, int channel_count, 
 	     int *timer_mode_list, int timer_mode_count, int timer_divisor,
+	     int *gain_list, int gain_count,  
 	     int convert, int maxlines);
 int nerdDoStream(const char *address, int *channel_list, int channel_count,
 		 int precision, unsigned long period, int convert, int lines,
 		 int showmem);
-int data_callback(int channels, uint16_t * data, void *context);
+int data_callback(int channels,  int *channel_list, int gain_count, int *gain_list, 
+		uint16_t * data, void *context);
 
 int columns_left = 0;
 void handle_sig(int sig)
@@ -108,6 +111,8 @@ int main(int argc, char *argv[])
 	int timer_mode_list[UE9_TIMERS];
 	int timer_mode_count = 0;
 	int timer_divisor = 1;
+	int gain_list[MAX_CHANNELS];
+	int gain_count = 0;
 	int channel_list[MAX_CHANNELS];
 	int channel_count = 0;
 	int nerdjack = 0;
@@ -155,6 +160,29 @@ int main(int argc, char *argv[])
 					goto printhelp;
 				}
 				channel_list[channel_count++] = tmp;
+				optarg = endp + 1;
+			}
+			while (*endp);
+			break;
+		case 'g':	/* labjack only */
+			gain_count = 0;
+			do {
+				tmp = strtol(optarg, &endp, 0);
+				if (*endp != '\0' && *endp != ',') {
+					info("bad gain number: %s\n",
+					     optarg);
+					goto printhelp;
+				}
+				if (gain_count >= MAX_CHANNELS) {
+					info("error: too many gains specified\n");
+					goto printhelp;
+				}
+				if (!(tmp == 0 || tmp == 1 || tmp == 2 || tmp == 4 || tmp == 8)) {
+				info("error: invalid gain specified\n");
+					goto printhelp;
+				}
+								
+				gain_list[gain_count++] = tmp;
 				optarg = endp + 1;
 			}
 			while (*endp);
@@ -375,6 +403,12 @@ int main(int argc, char *argv[])
 		goto printhelp;
 	}
 
+	/* Individual Analog Channel Gain Set requires Labjack*/
+	if (gain_count && !labjack) {
+		info("Can't use Individual Gain Set on NerdJack\n");
+		goto printhelp;
+	}
+
 	if (optind < argc) {
 		info("error: too many arguments (%s)\n\n", argv[optind]);
 		goto printhelp;
@@ -450,6 +484,7 @@ int main(int argc, char *argv[])
 			ret = doStream(address, scanconfig, scaninterval,
 				       channel_list, channel_count,
 				       timer_mode_list, timer_mode_count, timer_divisor,
+				       gain_list, gain_count,
 				       convert, lines);
 			verb("doStream returned %d\n", ret);
 		}
@@ -599,6 +634,7 @@ int
 doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	 int *channel_list, int channel_count, 
 	 int *timer_mode_list, int timer_mode_count, int timer_divisor,
+	 int *gain_list, int gain_count,
 	 int convert, int lines)
 {
 	int retval = -EAGAIN;
@@ -647,12 +683,22 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 		goto out2;
 	}		
 
-	/* Set stream configuration */
-	if (ue9_streamconfig_simple(fd_cmd, channel_list, channel_count,
-				    scanconfig, scaninterval,
-				    UE9_BIPOLAR_GAIN1) < 0) {
-		info("Failed to set stream configuration\n");
-		goto out2;
+	if (gain_count) {
+		/* Set stream configuration */
+		if (ue9_streamconfig(fd_cmd, channel_list, channel_count,
+						scanconfig, scaninterval,
+						gain_list, gain_count) < 0) {
+			info("Failed to set stream configuration\n");
+			goto out2;
+		}
+	} else 	{
+		/* Set stream configuration */
+		if (ue9_streamconfig_simple(fd_cmd, channel_list, channel_count,
+						scanconfig, scaninterval,
+						UE9_BIPOLAR_GAIN1) < 0) {
+			info("Failed to set stream configuration\n");
+			goto out2;
+		}
 	}
 
 	/* Start stream */
@@ -663,7 +709,7 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 
 	/* Stream data */
 	ret =
-	    ue9_stream_data(fd_data, channel_count, data_callback, (void *)&ci);
+	    ue9_stream_data(fd_data, channel_count, channel_list, gain_count, gain_list, data_callback, (void *)&ci);
 	if (ret < 0) {
 		info("Data stream failed with error %d\n", ret);
 		goto out3;
@@ -684,7 +730,7 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	return retval;
 }
 
-int data_callback(int channels, uint16_t * data, void *context)
+int data_callback(int channels, int *channel_list, int gain_count, int *gain_list, uint16_t * data, void *context)
 {
 	int i;
 	struct callbackInfo *ci = (struct callbackInfo *)context;
@@ -693,12 +739,20 @@ int data_callback(int channels, uint16_t * data, void *context)
 	columns_left = channels;
 	for (i = 0; i < channels; i++) {
 		if (ci->convert == CONVERT_VOLTS &&
-		    i <= UE9_MAX_ANALOG_CHANNEL) {
+		    channel_list[i] <= UE9_MAX_ANALOG_CHANNEL) {
 			/* CONVERT_VOLTS */
+			if (i < gain_count)
+			{
 			if (printf("%lf", ue9_binary_to_analog(
-					   &ci->calib, UE9_BIPOLAR_GAIN1,
+					   &ci->calib, gain_list[i],
 					   12, data[i])) < 0)
 				goto bad;
+			} else {
+			if (printf("%lf", ue9_binary_to_analog(
+					   &ci->calib, 0,
+					   12, data[i])) < 0)
+				goto bad;
+			}
 		} else if (ci->convert == CONVERT_HEX) {
 			/* CONVERT_HEX */
 			if (printf("%04X", data[i]) < 0)

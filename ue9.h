@@ -104,7 +104,7 @@ int ue9_get_control_config(int fd, struct ue9ControlConfig *config);
 
 /* Data conversion.  If calib is NULL, use uncalibrated conversions. */
 double ue9_binary_to_analog(struct ue9Calibration *calib,
-			    uint8_t gain, uint8_t resolution, uint16_t data);
+			    int gain, uint8_t resolution, uint16_t data);
 
 /* Compute scanrate based on the provided values. */
 double ue9_compute_rate(uint8_t scanconfig, uint16_t scaninterval);
@@ -134,14 +134,19 @@ int ue9_command(int fd, uint8_t * out, uint8_t * in, int inlen);
 int ue9_streamconfig_simple(int fd, int *channel_list, int channel_count,
 			    uint8_t scanconfig, uint16_t scaninterval,
 			    uint8_t gain);
+				
+/* Stream configuration, each Analog Input channel can have its own gain. */
+int ue9_streamconfig(int fd, int *channel_list, int channel_count,
+			    uint8_t scanconfig, uint16_t scaninterval,
+			    int *gain_list, int gain_count);
 
 /* Timer configuration */
 int ue9_timer_config(int fd, int *mode_list, int mode_count, int divisor);
 
 /* Stream data and pass it to the data callback.  If callback returns
    negative, stops reading and returns 0.  Returns < 0 on error. */
-typedef int (*ue9_stream_cb_t) (int channels, uint16_t * data, void *context);
-int ue9_stream_data(int fd, int channels,
+typedef int (*ue9_stream_cb_t) (int channels, int *channel_list, int gain_count, int *gain_list, uint16_t * data, void *context);
+int ue9_stream_data(int fd, int channels, int *channel_list, int gain_count, int *gain_list,
 		    ue9_stream_cb_t callback, void *context);
 
 #endif

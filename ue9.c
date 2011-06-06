@@ -119,7 +119,7 @@ int ue9_verify_extended(uint8_t * buffer, size_t len)
 /* Data conversion.  If calib is NULL, use uncalibrated conversions. */
 double
 ue9_binary_to_analog(struct ue9Calibration *calib,
-		     uint8_t gain, uint8_t resolution, uint16_t data)
+		     int gain, uint8_t resolution, uint16_t data)
 {
 	double slope = 0, offset;
 
@@ -133,13 +133,27 @@ ue9_binary_to_analog(struct ue9Calibration *calib,
 	}
 
 	if (resolution < 18) {
-		if (gain <= 3) {
-			slope = calib->unipolarSlope[gain];
-			offset = calib->unipolarOffset[gain];
-		} else if (gain == 8) {
-			slope = calib->bipolarSlope;
-			offset = calib->bipolarOffset;
-		}
+		switch (gain) {
+			case 1:
+				slope = calib->unipolarSlope[0];
+				offset = calib->unipolarOffset[0];
+				break;
+			case 2:
+				slope = calib->unipolarSlope[1];
+				offset = calib->unipolarOffset[1];
+				break;
+			case 4:
+				slope = calib->unipolarSlope[2];
+				offset = calib->unipolarOffset[2];
+				break;
+			case 8:
+				slope = calib->unipolarSlope[3];
+				offset = calib->unipolarOffset[3];
+				break;
+			default:
+				slope = calib->bipolarSlope;
+				offset = calib->bipolarOffset;
+				}
 	} else {
 		if (gain == 0) {
 			slope = calib->hiResUnipolarSlope;
@@ -588,6 +602,74 @@ ue9_streamconfig_simple(int fd, int *channel_list, int channel_count,
 	return 0;
 }
 
+/* Stream configuration, each Analog Input channel can have its own gain. */
+int
+ue9_streamconfig(int fd, int *channel_list, int channel_count,
+			uint8_t scanconfig, uint16_t scaninterval, int *gain_list, int gain_count)
+{
+	int i;
+	uint8_t buf[256];
+
+	/* Set up StreamConfig command with channels and scan options */
+	buf[1] = 0xF8;		/* Extended command */
+	buf[2] = channel_count + 3;	/* Command data words */
+	buf[3] = 0x11;		/* StreamConfig */
+	buf[6] = channel_count;	/* Number of channels */
+	buf[7] = 12;		/* Bit resolution */
+	buf[8] = 0;		/* Extra settling time */
+	buf[9] = scanconfig;
+	buf[10] = scaninterval & 0xff;
+	buf[11] = scaninterval >> 8;
+
+	for (i = 0; i < channel_count; i++) {
+		buf[12 + 2 * i] = channel_list[i];	/* Channel number */
+		if (i < gain_count) {
+			switch (gain_list[i]) {
+				case 0:
+					buf[13 + 2 * i] = UE9_BIPOLAR_GAIN1;
+				break;
+					
+				case 1:
+					buf[13 + 2 * i] = UE9_UNIPOLAR_GAIN1;
+				break;
+			
+				case 2:
+					buf[13 + 2 * i] = UE9_UNIPOLAR_GAIN2;
+				break;
+				
+				case 4:
+					buf[13 + 2 * i] = UE9_UNIPOLAR_GAIN4;
+				break;
+			
+				case 8:
+					buf[13 + 2 * i] = UE9_UNIPOLAR_GAIN8;
+				break;
+				
+				default:
+					buf[13 + 2 * i] = UE9_BIPOLAR_GAIN1;
+			}
+		}
+		else
+		{
+			buf[13 + 2 * i] = UE9_BIPOLAR_GAIN1;
+		}
+	}
+
+	/* Send StreamConfig */
+	if (ue9_command(fd, buf, buf, 8) < 0) {
+		debug("command failed\n");
+		return -1;
+	}
+
+	if (buf[6] != 0) {
+		verb("returned error %s\n", ue9_error(buf[6]));
+		return -1;
+	}
+
+	return 0;
+}
+
+
 /* Timer configuration */
 int ue9_timer_config(int fd, int *mode_list, int mode_count, int divisor)
 {
@@ -639,7 +721,7 @@ int ue9_timer_config(int fd, int *mode_list, int mode_count, int divisor)
 /* Stream data and pass it to the data callback.  If callback returns
    negative, stops reading and returns 0.  Returns < 0 on error. */
 int
-ue9_stream_data(int fd, int channels, ue9_stream_cb_t callback, void *context)
+ue9_stream_data(int fd, int channels, int *channel_list, int gain_count, int *gain_list, ue9_stream_cb_t callback, void *context)
 {
 	int ret;
 	uint8_t buf[46];
@@ -708,7 +790,7 @@ ue9_stream_data(int fd, int channels, ue9_stream_cb_t callback, void *context)
 
 			/* Received a full scan, send to callback */
 			channel = 0;
-			if ((*callback) (channels, data, context) < 0) {
+			if ((*callback) (channels, channel_list, gain_count, gain_list, data, context) < 0) {
 				/* We're done */
 				return 0;
 			}

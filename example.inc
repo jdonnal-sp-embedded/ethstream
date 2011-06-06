@@ -71,4 +71,36 @@ specified, ethstream connects first to 192.168.1.209.  It then tries\n\
 to autodetect the NerdJack.  This should find the device if you are on\n\
 the same network, but it will get confused if there are multiple NerdJacks\n\
 on the network.\n\
+\n\
+Labjack only Timer modes are also avaliable.  Read the Labjack UE9 Users Guide\n\
+for more information.  Upto 6 timers of various modes can be specified,\n\
+they occur on FIO0-FIO5 which are on channels 200-205 respectively in order\n\
+of specification.  For 32 bit timer modes, the MSW should be read from\n\
+channel 224 imeadiately after the LSW is read from one the timer channel.\n\
+A clock frequency divisor is specified on a per device basis.  For example:\n\
+\n\
+    ethstream -t 4,12 -T 1 -C 200,224,201\n\
+\n\
+This will enable two timers with the fastest system clock divisor (48 MhZ/1)\n\
+and read the two 16 bit words for timer mode 4 and the single 16 bit word of\n\
+timer mode 12.  These three words will occupy their own columns in the output\n\
+stream.  Digital timer mode channels can be interspersed with analog inouts.\n\
+\n\
+Labjack only individual analog input channel gain set is also avaliable.\n\
+Gain 0 is default on labjack and corresponds to -5.18v to +5.07v.  Gain 1 is\n\
+is -0.01 to +5.07v.  Gain 2 is -0.01 to +2.53v.  Gain 4 is -0.01 to +1.26v.\n\
+Gain 8 is -0.01 to +0.62v.  Gains on the -g flag should be put in the desired\n\
+order corresponding to the channels as specified by the -C flag.  If there are\n\
+less gains specified than channels the remainder default to gain 0.  Extra gains\n\
+are ignored.  Gains can be specified for digital inputs or timer modes but they\n\
+are irrelevant.  A case where one should do this is if there are dital input\n\
+channels intersperced within analog input channels; this keeps the order matched\n\
+up so later analog input channels have the expected gain.\n\
+\n\
+    ethstream -t 4 -T 1 -C 0,1,200,224,2,3 -g 2,2,0,0,4,4 -c\n\
+\n\
+This will set channles 0,1 and 2,3 to gain 2,2 and 4,4, respectively and convert\n\
+the data to volts using the firmware stored factory calibrated data on the\n\
+labjack. The digital channels 200 and 224 will remain undisturbed as integers.\n\
+\n\
 ";
