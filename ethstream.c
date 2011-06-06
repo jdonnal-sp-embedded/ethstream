@@ -54,7 +54,7 @@ struct options opt[] = {
 	{'d', "detect", NULL, "Detect NerdJack IP address"},
 	{'R', "range", "a,b",
 	 "Set range on NerdJack for channels 0-5,6-11 to either 5 or 10 (10,10)"},
-	{'g', "gian", "a,b,c", "Set Labjack AIN channel gains: 0,1,2,4,8 in -C channel order"},
+	{'g', "gain", "a,b,c", "Set Labjack AIN channel gains: 0,1,2,4,8 in -C channel order"},
 	{'o', "oneshot", NULL, "don't retry in case of errors"},
 	{'f', "forceretry", NULL, "retry no matter what happens"},
 	{'c', "convert", NULL, "convert output to volts"},
