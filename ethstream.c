@@ -47,7 +47,7 @@ struct options opt[] = {
 	{'r', "rate", "hz", "sample each channel at this rate (8000.0)"},
 
 	{'L', "labjack", NULL, "Force LabJack device"},
-	{'t', "timers", "a,b,c", "set LabJack timer modes to a, b, and c"},
+	{'t', "timers", "a[:A],b[:B]", "set LabJack timer modes a,b and optional values A,B"},
 	{'T', "timerdivisor", "n", "set LabJack timer divisor to n"},
 
 	{'N', "nerdjack", NULL, "Force NerdJack device"},
@@ -71,7 +71,8 @@ struct options opt[] = {
 
 int doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	     int *channel_list, int channel_count, 
-	     int *timer_mode_list, int timer_mode_count, int timer_divisor,
+	     int *timer_mode_list, int *timer_value_list,
+	     int timer_mode_count, int timer_divisor,
 	     int *gain_list, int gain_count,  
 	     int convert, int maxlines);
 int nerdDoStream(const char *address, int *channel_list, int channel_count,
@@ -109,6 +110,7 @@ int main(int argc, char *argv[])
 	uint8_t scanconfig;
 	uint16_t scaninterval;
 	int timer_mode_list[UE9_TIMERS];
+	int timer_value_list[UE9_TIMERS];
 	int timer_mode_count = 0;
 	int timer_divisor = 1;
 	int gain_list[MAX_CHANNELS];
@@ -190,8 +192,9 @@ int main(int argc, char *argv[])
 		case 't':	/* labjack only */
 			timer_mode_count = 0;
 			do {
+				/* get mode */
 				tmp = strtol(optarg, &endp, 0);
-				if (*endp != '\0' && *endp != ',') {
+				if (*endp != '\0' && *endp != ',' && *endp != ':') {
 					info("bad timer mode: %s\n", optarg);
 					goto printhelp;
 				}
@@ -199,7 +202,22 @@ int main(int argc, char *argv[])
 					info("error: too many timers specified\n");
 					goto printhelp;
 				}
-				timer_mode_list[timer_mode_count++] = tmp;
+				timer_mode_list[timer_mode_count] = tmp;
+
+				/* get optional value */
+				if (*endp == ':') {
+					optarg = endp + 1;
+					tmp = strtol(optarg, &endp, 0);
+					if (*endp != '\0' && *endp != ',') {
+						info("bad timer value: %s\n", optarg);
+						goto printhelp;
+					}
+					timer_value_list[timer_mode_count] = tmp;
+				} else {
+					timer_value_list[timer_mode_count] = 0;
+				}
+
+				timer_mode_count++;					
 				optarg = endp + 1;
 			}
 			while (*endp);
@@ -485,7 +503,8 @@ int main(int argc, char *argv[])
 		} else {
 			ret = doStream(address, scanconfig, scaninterval,
 				       channel_list, channel_count,
-				       timer_mode_list, timer_mode_count, timer_divisor,
+				       timer_mode_list, timer_value_list, 
+				       timer_mode_count, timer_divisor,
 				       gain_list, gain_count,
 				       convert, lines);
 			verb("doStream returned %d\n", ret);
@@ -635,7 +654,8 @@ nerdDoStream(const char *address, int *channel_list, int channel_count,
 int
 doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	 int *channel_list, int channel_count, 
-	 int *timer_mode_list, int timer_mode_count, int timer_divisor,
+	 int *timer_mode_list, int *timer_value_list,
+	 int timer_mode_count, int timer_divisor,
 	 int *gain_list, int gain_count,
 	 int convert, int lines)
 {
@@ -679,8 +699,8 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 
 	/* Set timer configuration */
 	if (timer_mode_count &&
-	    ue9_timer_config(fd_cmd, timer_mode_list, timer_mode_count,
-			     timer_divisor) < 0) {
+	    ue9_timer_config(fd_cmd, timer_mode_list, timer_value_list,
+			     timer_mode_count, timer_divisor) < 0) {
 		info("Failed to set timer configuration\n");
 		goto out2;
 	}		

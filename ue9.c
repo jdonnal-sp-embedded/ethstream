@@ -671,12 +671,12 @@ ue9_streamconfig(int fd, int *channel_list, int channel_count,
 
 
 /* Timer configuration */
-int ue9_timer_config(int fd, int *mode_list, int mode_count, int divisor)
+int ue9_timer_config(int fd, int *mode_list, int *value_list, int count, int divisor)
 {
 	int i;
 	uint8_t buf[256];
 
-	if (mode_count < 0 || mode_count > 6) {
+	if (count < 0 || count > 6) {
 		verb("invalid count\n");
 		return -1;
 	}
@@ -686,17 +686,21 @@ int ue9_timer_config(int fd, int *mode_list, int mode_count, int divisor)
 	buf[2] = 0x0C;		/* Command data words */
 	buf[3] = 0x18;		/* TimerConfig */
 	buf[6] = divisor;	/* TimerClockDivisor */
-	buf[7] = 0x80 | mode_count;	/* Number of timers enabled, UpdateConfig=1 */
+	buf[7] = 0x80 | count;	/* Number of timers enabled, UpdateConfig=1 */
 	buf[8] = 0x01;		/* TimerClockBase = System 48MHz */
 	buf[9] = 0x00;		/* Don't reset */
 
 	for (i = 0; i < 6; i++) {
-		if (i < mode_count)
+		if (i < count) {
 			buf[10 + 3 * i] = mode_list[i];
-		else
+			buf[11 + 3 * i] = value_list[i] & 0xff;
+			buf[12 + 3 * i] = value_list[i] >> 8;
+		}
+		else {
 			buf[10 + 3 * i] = 0;
-		buf[11 + 3 * i] = 0;
-		buf[12 + 3 * i] = 0;
+			buf[11 + 3 * i] = 0;
+			buf[12 + 3 * i] = 0;
+		}
 	}
 
 	buf[28] = 0;

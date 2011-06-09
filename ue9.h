@@ -141,7 +141,7 @@ int ue9_streamconfig(int fd, int *channel_list, int channel_count,
 			    int *gain_list, int gain_count);
 
 /* Timer configuration */
-int ue9_timer_config(int fd, int *mode_list, int mode_count, int divisor);
+int ue9_timer_config(int fd, int *mode_list, int *value_list, int count, int divisor);
 
 /* Stream data and pass it to the data callback.  If callback returns
    negative, stops reading and returns 0.  Returns < 0 on error. */
