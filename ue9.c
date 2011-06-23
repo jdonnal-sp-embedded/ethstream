@@ -116,6 +116,20 @@ int ue9_verify_extended(uint8_t * buffer, size_t len)
 	return 1;
 }
 
+/* Temperature conversion.  If calib is NULL, use uncalibrated conversions. */
+double ue9_binary_to_temperature(struct ue9Calibration *calib, uint16_t data)
+{
+	double slope;
+
+	if (calib == NULL) {
+		slope = 0.012683;
+	} else {
+		slope = calib->tempSlope;
+	}
+
+	return data * slope; /* output is in Kelvin */
+}
+
 /* Data conversion.  If calib is NULL, use uncalibrated conversions. */
 double
 ue9_binary_to_analog(struct ue9Calibration *calib,
@@ -804,6 +818,6 @@ ue9_stream_data(int fd, int channels, int *channel_list, int gain_count, int *ga
 
 /*
 Local variables:
-c-basic-offset: 2
+c-basic-offset: 8
 End:
 */

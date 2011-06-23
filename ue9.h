@@ -106,6 +106,9 @@ int ue9_get_control_config(int fd, struct ue9ControlConfig *config);
 double ue9_binary_to_analog(struct ue9Calibration *calib,
 			    int gain, uint8_t resolution, uint16_t data);
 
+/* Temperature conversion.  If calib is NULL, use uncalibrated conversions. */
+double ue9_binary_to_temperature(struct ue9Calibration *calib, uint16_t data);
+
 /* Compute scanrate based on the provided values. */
 double ue9_compute_rate(uint8_t scanconfig, uint16_t scaninterval);
 

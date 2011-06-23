@@ -57,7 +57,7 @@ struct options opt[] = {
 	{'g', "gain", "a,b,c", "Set Labjack AIN channel gains: 0,1,2,4,8 in -C channel order"},
 	{'o', "oneshot", NULL, "don't retry in case of errors"},
 	{'f', "forceretry", NULL, "retry no matter what happens"},
-	{'c', "convert", NULL, "convert output to volts"},
+	{'c', "convert", NULL, "convert output to volts/temperature"},
 	{'H', "converthex", NULL, "convert output to hex"},
 	{'m', "showmem", NULL, "output memory stats with data (NJ only)"},
 	{'l', "lines", "num", "if set, output this many lines and quit"},
@@ -765,16 +765,22 @@ int data_callback(int channels, int *channel_list, int gain_count, int *gain_lis
 			/* CONVERT_VOLTS */
 			if (i < gain_count)
 			{
-			if (printf("%lf", ue9_binary_to_analog(
-					   &ci->calib, gain_list[i],
-					   12, data[i])) < 0)
-				goto bad;
+				if (printf("%lf", ue9_binary_to_analog(
+						   &ci->calib, gain_list[i],
+						   12, data[i])) < 0)
+					goto bad;
 			} else {
-			if (printf("%lf", ue9_binary_to_analog(
-					   &ci->calib, 0,
-					   12, data[i])) < 0)
-				goto bad;
+				if (printf("%lf", ue9_binary_to_analog(
+						   &ci->calib, 0,
+						   12, data[i])) < 0)
+					goto bad;
 			}
+		} else if (ci->convert == CONVERT_VOLTS &&
+			   (channel_list[i] == 141 || channel_list[i] == 133)) {
+			/* CONVERT_VOLTS but output temperature */
+			if (printf("%lf", ue9_binary_to_temperature(
+					   &ci->calib, data[i])) < 0)
+				goto bad;
 		} else if (ci->convert == CONVERT_HEX) {
 			/* CONVERT_HEX */
 			if (printf("%04X", data[i]) < 0)
