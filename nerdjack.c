@@ -97,6 +97,7 @@ static int discovered_sock_create(struct discover_t *ds, uint32_t local_ip,
 	/* Set nonblocking */
 	if (soblock(sock, 0) < 0) {
 		verb("can't set nonblocking\n");
+		close(sock);
 		return 0;
 	}
 

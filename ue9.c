@@ -402,6 +402,7 @@ int ue9_open(const char *host, int port)
 	/* Set nonblocking */
 	if (soblock(fd, 0) < 0) {
 		verb("can't set nonblocking\n");
+		close(fd);
 		return -1;
 	}
 
@@ -417,6 +418,7 @@ int ue9_open(const char *host, int port)
 	he = gethostbyname(host);
 	if (he == NULL) {
 		verb("gethostbyname(\"%s\") failed\n", host);
+		close(fd);
 		return -1;
 	}
 	address.sin_addr = *((struct in_addr *)he->h_addr);
@@ -429,6 +431,7 @@ int ue9_open(const char *host, int port)
 			    .tv_sec = TIMEOUT}) < 0) {
 		verb("connection to %s:%d failed: %s\n",
 		     inet_ntoa(address.sin_addr), port, compat_strerror(errno));
+		close(fd);
 		return -1;
 	}
 	
