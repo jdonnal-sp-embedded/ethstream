@@ -14,7 +14,9 @@
 # Build options
 
 CFLAGS += -Wall -g #-pg
-LDFLAGS += -lm #-pg
+LDFLAGS += #-pg
+LDLIBS += -lm #CHANGED location from LDFLAGS for proper linking using gcc 
+
 PREFIX = /usr/local
 MANPATH = ${PREFIX}/man/man1/
 BINPATH = ${PREFIX}/bin

@@ -27,7 +27,8 @@
 /* Packet structure used in message to start sampling on NerdJack */
 typedef struct __attribute__ ((__packed__)) {
 	char word[4];
-	unsigned long period;
+	unsigned int period; //CHANGED FROM TYPE LONG. With 64 bit compilers longs are 8 bytes and nerdjack expects a 4 byte value
+	//since the int type is 4 bytes this works but should be changed to use defined datatypes rather than rely on compiler data types
 	unsigned short channelbit;
 	unsigned char precision;
 	unsigned char prescaler;
