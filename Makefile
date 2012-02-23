@@ -15,7 +15,7 @@
 
 CFLAGS += -Wall -g #-pg
 LDFLAGS += #-pg
-LDLIBS += -lm #CHANGED location from LDFLAGS for proper linking using gcc 
+LDLIBS += -lm
 
 PREFIX = /usr/local
 MANPATH = ${PREFIX}/man/man1/
@@ -51,7 +51,7 @@ obj-common = opt.o ue9.o ue9error.o netutil.o debug.o nerdjack.o
 obj-ethstream = ethstream.o $(obj-common)
 
 ethstream: $(obj-ethstream)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 ethstream.exe: $(obj-ethstream:.o=.obj) compat-win32.obj
 
