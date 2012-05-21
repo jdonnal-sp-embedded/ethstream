@@ -68,6 +68,7 @@ struct ue9ControlConfig {
 	uint16_t dac1;
 };
 
+/* These are correct! 0, 1, 2, 3, 8 */
 #define UE9_UNIPOLAR_GAIN1 0x00
 #define UE9_UNIPOLAR_GAIN2 0x01
 #define UE9_UNIPOLAR_GAIN4 0x02

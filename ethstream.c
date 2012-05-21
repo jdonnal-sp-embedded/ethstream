@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
 					info("error: too many gains specified\n");
 					goto printhelp;
 				}
-				if (!(tmp == 0 || tmp == 1 || tmp == 2 || tmp == 4 || tmp == 8)) {
+				if (!(tmp == 0 || tmp == 1 || tmp == 2 || tmp == 3 || tmp == 8)) {
 				info("error: invalid gain specified\n");
 					goto printhelp;
 				}
