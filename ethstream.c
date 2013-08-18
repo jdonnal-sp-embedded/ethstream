@@ -312,7 +312,7 @@ int main(int argc, char *argv[])
 			return 0;
 			break;
 		case 'V':
-			printf("etherstream " VERSION "\n");
+			printf("ethstream " VERSION "\n");
 			printf("Written by Jim Paris <jim@jtan.com>\n");
 			printf("and Zachary Clifford <zacharyc@mit.edu>.\n");
 			printf("This program comes with no warranty and is "
