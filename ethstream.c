@@ -82,11 +82,33 @@ int data_callback(int channels,  int *channel_list, int gain_count, int *gain_li
 		uint16_t * data, void *context);
 
 int columns_left = 0;
+
+////////EXTRA GLOBAL VARS///////////
+//  for clean shutdown            //
+//  added by John Donnal 2015     //
+////////////////////////////////////
+int fd_cmd, fd_data;
+int ue9_running = 0; //flag if labjack is currently streaming data
+
 void handle_sig(int sig)
 {
 	while (columns_left--) {
 		printf(" 0");
 	}
+
+	/******************************************************
+	 *         added by John Donnal 2015                  *
+	 * Close out connection to LabJack, firmware glitches *
+	 * if the stream is not closed correctly              *
+	 ******************************************************/
+	if(ue9_running==1){
+	  printf("Performing clean shutdown of LabJack\n");
+	  ue9_stream_stop(fd_cmd);
+	  ue9_buffer_flush(fd_cmd);
+	  ue9_close(fd_data);
+	  ue9_close(fd_cmd);
+	}
+	/******************************************************/
 	fflush(stdout);
 	exit(0);
 }
@@ -660,7 +682,7 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	 int convert, int lines)
 {
 	int retval = -EAGAIN;
-	int fd_cmd, fd_data;
+	//	int fd_cmd, fd_data; *these are now globals so sighandler can use them*
 	int ret;
 	static int first_call = 1;
 	struct callbackInfo ci = {
@@ -730,6 +752,7 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
 	}
 
 	/* Stream data */
+	ue9_running = 1;
 	ret =
 	    ue9_stream_data(fd_data, channel_count, channel_list, gain_count, gain_list, data_callback, (void *)&ci);
 	if (ret < 0) {
@@ -749,6 +772,7 @@ doStream(const char *address, uint8_t scanconfig, uint16_t scaninterval,
  out1:
 	ue9_close(fd_cmd);
  out:
+	ue9_running = 0;
 	return retval;
 }
 
